@@ -171,7 +171,7 @@ def get_pair_stat_test_result(test_name, ax_category_level,group_order, group_1_
         group_mean_dict = {'group_1_mean':np.nanmean(data_group_1_values), 'group_1_sem':scipy.stats.sem(data_group_1_values,nan_policy = 'omit' ),
                             'group_2_mean':np.nanmean(data_group_2_values), 'group_2_sem':scipy.stats.sem(data_group_2_values,nan_policy = 'omit')}
     #pack and return result dict
-    print(group_order)
+    # print(group_order)
     if ax_var_is_hue: #if x categorical ticks = hue groups, find index of group1 name in hue order
         group_pos = {'group_1_order_pos': get_match_index_in_iterable(group_order, group_1_name),
                    'group_2_order_pos': get_match_index_in_iterable(group_order, group_2_name)}
