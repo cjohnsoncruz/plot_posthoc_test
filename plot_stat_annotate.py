@@ -6,8 +6,39 @@ import scipy
 from scipy import stats
 from stat_tests import * 
 
+### NEW in DEVELOPMENT- DETECT ERRORBARS FUNCTIONS
+def check_if_row_has_nan(input_array):
+    return np.any(np.isnan(input_array),axis = 1)
 
-## functinos
+def get_ax_children_types(ax_obj):
+    ''' To- return list stating what type each child of the mplt ax object is'''
+    return [type(x) for x in ax_obj.get_children()]
+
+path_collection_type = matplotlib.collections.PathCollection
+line_type = matplotlib.lines.Line2D
+
+def return_ci_bar_coord(ax_childs, ax_child_points_index):
+    ''' Given a set of indices of the ax child objects between which to query (e.g. path collections index), find fully nonnan yvals in the lines (corresponding to the actual real vertical errorbar) and return coords'''
+    #get errorbar lims via #get non nan values
+    ci_info = []
+    for count, i in enumerate(ax_child_points_index):
+        #get range around points, looking back  
+        if count == 0:
+            range_start = 0
+        else: 
+            range_start = ax_child_points_index[count-1]+1
+        range_end = i
+        # main body
+        child_range = ax_childs[range_start: range_end]
+        ci_x = [x.get_xdata() for x in child_range]
+        ci_y = [x.get_ydata() for x in child_range]
+        ci_nonnan_index = [count for count, x in enumerate([np.any(x) for x in np.isnan(ci_y)]) if x == False][0] #errorbar is entry with 0 nan values
+        #store as dict for transform in to df
+        curr_ci = {'ci_index': ci_nonnan_index + range_start, 'ci_xvals': ci_x[ci_nonnan_index], 'ci_yvals': ci_y[ci_nonnan_index] }
+        ci_info.append(curr_ci)
+    return pd.DataFrame.from_records(ci_info)
+
+## main  functinos
 #common error- ValueError: Cannot set a DataFrame with multiple columns to the single column g1_num_loc- this is if you mistype the hue value or you use the wrong version of SNS 
 def main_run_posthoc_tests_and_get_hue_loc_df(ax_input, plot_params, plot_obj, preset_comparisons,
                                                hue_var= None, test_name = None, hue_order = None, ax_var_is_hue=False):
