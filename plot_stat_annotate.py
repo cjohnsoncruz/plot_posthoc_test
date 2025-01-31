@@ -27,11 +27,11 @@ def main_run_posthoc_tests_and_get_hue_loc_df(ax_input, plot_params, plot_obj, p
     Returns:
     pandas.DataFrame: DataFrame with posthoc test results and hue locations.
     """
-    if hue_var == None:
+    if hue_var is None:
         hue_var = plot_params['hue']
-    if hue_order == None:
+    if hue_order is None:
         hue_order = plot_params['hue_order']
-    if test_name == None:
+    if test_name is None:
         test_name = None
         # group_order- depends on if comparing within x axis, or within hues 
     if ax_var_is_hue: #you will use this to find the ordering of the hue collection points of interest
@@ -69,7 +69,7 @@ def run_posthoc_tests_on_all_ax_ticks(plot_data, plot_obj, comparison_list, ax_g
     Returns:
     pandas.DataFrame: DataFrame with posthoc test results.
     """
-    if test_name == None:
+    if test_name is None:
         test_name = 'MWU'
    
     compare_stats_df = []
@@ -116,7 +116,7 @@ def run_posthoc_test_on_tick_hue_groups(ax_tick_data, hue_group_1, hue_group_2, 
     dict: Dictionary with the posthoc test results.
     """
     ##define test to run
-    if test_name == None:
+    if test_name is None:
         test_name = 'MWU'
     ## extract groups
     # ax_tick_data =plot_data.loc[plot_data[ax_grouping_col] ==  ax_category_level,:]
@@ -206,12 +206,12 @@ def get_hue_loc_on_axis(hue_loc_df, posthoc_df):
         #index into hueloc df, with index = hue Group_1 name of posthoc df ; then, get list of point vals in collection; then, 
     posthoc_df['hue_group_1_locs'] = posthoc_df.apply(lambda x: hue_loc_df.loc[x['group_1']], axis = 1) #elem index = what x tick num elem is centered on
     posthoc_df['hue_group_2_locs'] = posthoc_df.apply(lambda x: hue_loc_df.loc[x['group_2']], axis = 1) #elem index = what x tick num elem is centered on
-    posthoc_df['g1_num_loc'] = posthoc_df.apply(lambda x: x['hue_group_1_locs'][x['group_1_order_pos'][0],1], axis = 1) #x['group_1_order_pos'][0] = position of group_1 being used, in ordered list of collections 
-    posthoc_df['g2_num_loc'] = posthoc_df.apply(lambda x: x['hue_group_2_locs'][x['group_2_order_pos'][0],1], axis = 1) #x['group_1_order_pos'][0] = position of group_1 being used, in ordered list of collections 
+    posthoc_df['g1_num_loc'] = posthoc_df.apply(lambda x: x['hue_group_1_locs'][x['group_1_order_pos'][0],1], axis = 1) #x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections 
+    posthoc_df['g2_num_loc'] = posthoc_df.apply(lambda x: x['hue_group_2_locs'][x['group_2_order_pos'][0],1], axis = 1) #x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections 
 
     ## get location of poitns on the categorical axis (usually x but not always)
-    posthoc_df['g1_cat_loc'] = posthoc_df.apply(lambda x: x['hue_group_1_locs'][x['group_1_order_pos'][0],0], axis = 1) #x['group_1_order_pos'][0] = position of group_1 being used, in ordered list of collections 
-    posthoc_df['g2_cat_loc'] = posthoc_df.apply(lambda x: x['hue_group_2_locs'][x['group_2_order_pos'][0],0], axis = 1) #x['group_1_order_pos'][0] = position of group_1 being used, in ordered list of collections
+    posthoc_df['g1_cat_loc'] = posthoc_df.apply(lambda x: x['hue_group_1_locs'][x['group_1_order_pos'][0],0], axis = 1) #x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections 
+    posthoc_df['g2_cat_loc'] = posthoc_df.apply(lambda x: x['hue_group_2_locs'][x['group_2_order_pos'][0],0], axis = 1) #x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections
     #get max of numerical ax values
     posthoc_df['max_group_loc_val'] = posthoc_df[['g1_num_loc', 'g2_num_loc']].max(axis = 1)
     return posthoc_df 
@@ -415,7 +415,7 @@ def get_sig_bar_y_vals(bottom_val = None, line_height= 1.01):
     list: List of y-values for the significance bar.
     """
     """ comparison tuple max y value is multipled by offset factor"""
-    if bottom_val == None:
+    if bottom_val is None:
         bottom_val = 0.95 #for ax relative point plotting
     # bottom_val = comparison_tuple.max_group_loc_val * offset_factor #for data point plotting
     y_vals = [bottom_val,bottom_val* line_height, bottom_val*line_height,bottom_val]# list the 4 x coord for points that define the line
@@ -441,16 +441,16 @@ def plot_sig_bars_w_comp_df_tight(ax_input, sig_comp_df, direction_to_plot = Non
     transform_ax_to_data = ax_input.transAxes + ax_input.transData.inverted() #create ax-display + display-data pipe
     transform_data_to_ax = transform_ax_to_data.inverted() # 
     #default vcalues
-    if direction_to_plot == None:
+    if direction_to_plot is None:
         direction_to_plot = 'bottom_up'
         line_start_y_pos = 0.8 #base case- plot upwards from 0.8 of ax size 
-    if tight == None:
+    if tight is None:
         tight = True #set whether or not to plot bars RIGHT above datapoints
-    if tight_offset == None:
+    if tight_offset is None:
         tight_offset = 0.075 #fraction of ax to put between the point of interest and the line of sig post-hoc
     #params for offsetting
     line_height = 1.00 #base case- 1.01
-    if offset_constant==None:
+    if offset_constant is None:
         offset_constant = 0.0225 #what linear amount to add, in AX FRACTION AMOUNT 
     
     star_space_to_line = offset_constant*0.1
@@ -504,7 +504,7 @@ def plot_sig_bars_w_comp_df(ax_input, sig_comp_df, direction_to_plot = None):
     """
     """ TO- given parameters, plot vertical lines between centers of datapoints of interest (pre-sorted), with significance star (pre-calculated)"""
     ## plotting params
-    if direction_to_plot == None:#set direction to plot ('top_down', 'bottom_up')
+    if direction_to_plot is None:#set direction to plot ('top_down', 'bottom_up')
         direction_to_plot = 'bottom_up'
 
     line_height = 1.01
