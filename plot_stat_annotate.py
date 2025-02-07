@@ -6,8 +6,121 @@ import scipy
 from scipy import stats
 from stat_tests import * 
 
+## plotting functions
+## bottom up, but starting from close above points
+def plot_sig_bars_w_comp_df_tight(ax_input, sig_comp_df, direction_to_plot = None, tight = None, tight_offset = None, offset_constant=None, debug = None):
+    """ 
+    Plot significance bars with comparison dataframe, using a tight layout.
+    TO- given parameters, plot vertical lines between centers of datapoints of interest (pre-sorted), with significance star (pre-calculated)
+    Parameters
+    ax_input (matplotlib.axes.Axes): The input axis object.
+    sig_comp_df (pandas.DataFrame): DataFrame with significance comparisons.
+    direction_to_plot (str, optional): Direction to plot ('top_down', 'bottom_up'). Defaults to 'bottom_up'.
+    tight (bool, optional): Whether to plot bars right above their corresponding values. Defaults to True.
+    tight_offset (float, optional): Offset for tight layout. Defaults to 0.075.
+    offset_constant (float, optional): Constant for offset. Defaults to 0.0225.
+    debug (bool, optional): Whether to print debug information. Defaults to None.
+    """
+    ## plotting params    #set direction to plot ('top_down', 'bottom_up') #set whether bars are plotted right above their coresponding values, or not
+    #declare initial transforms of interest
+    transform_ax_to_data = ax_input.transAxes + ax_input.transData.inverted() #create ax-display + display-data pipe
+    transform_data_to_ax = transform_ax_to_data.inverted() # 
+    #default vcalues
+    if direction_to_plot is None:
+        direction_to_plot = 'bottom_up'
+        line_start_y_pos = 0.8 #base case- plot upwards from 0.8 of ax size 
+    if tight is None:
+        tight = True #set whether or not to plot bars RIGHT above datapoints
+    if tight_offset is None:
+        tight_offset = 0.075 #fraction of ax to put between the point of interest and the line of sig post-hoc
+    #params for offsetting
+    line_height = 1.00 #base case- 1.01
+    if offset_constant is None:
+        offset_constant = 0.0225 #what linear amount to add, in AX FRACTION AMOUNT 
+    
+    star_space_to_line = offset_constant*0.1
+    if debug == True:
+        print(f'tight format, max_numeric_ax_value = {max_numeric_ax_value}.  start y val  = {line_start_y_pos}')
+        #transData transforms: (DATA) -> (DISPLAY COORDINATES)     # transAxes transforms (AXES) -> (DISPLAY)     #all transforms -> display coords 
+    trans = matplotlib.transforms.blended_transform_factory(x_transform = ax_input.transData,
+                                                            y_transform = ax_input.transAxes)# the x coords of this transformation are data, and the y coord are axes
+    ## main loop over categorical ticks, bottom up approach 
+    for cat in sig_comp_df.category_compared_within.unique():#iterate over each categorical tick value
+        top_bbox = np.array([[0, 0],[0, 0]])#initialize box location for comparison # =[lower_x, lower_y] [upper_x, upper_y]
+        #get max y position value for each category you're doing post-hoc comparisons within
+        sig_comp_category = sig_comp_df.loc[sig_comp_df.category_compared_within == cat,:]
+        if tight:
+            max_numeric_ax_value = sig_comp_category.loc[:, ['g1_num_loc','g2_num_loc']].max().values.max()    #get max val in the group of interest you're running posthocs on (x ticks of interest)    
+            line_start_y_pos = transform_data_to_ax.transform((0,max_numeric_ax_value))[1]+tight_offset # data -> axes 
+            if debug == True:
+                print(f'tight format, max_numeric_ax_value = {max_numeric_ax_value}.  start y val  = {line_start_y_pos}')
+            #transData transforms: (DATA) -> (DISPLAY COORDINATES)     # transAxes transforms (AXES) -> (DISPLAY)     
+        for comp in sig_comp_category.itertuples():
+            x_vals = get_sig_bar_x_vals(comp) # [comp.g1_cat_loc, comp.g1_cat_loc, comp.g2_cat_loc, comp.g2_cat_loc]# list the 4 x coord for points that define the line
+            y_vals =get_sig_bar_y_vals(line_start_y_pos,line_height) #  [comp.max_group_loc_val, comp.max_group_loc_val * h, comp.max_group_loc_val * h, comp.max_group_loc_val] # list 4 y coord for points that define the line
+            #compare overlap of proposed y values, in data space 
+            line_overlap = (top_bbox[1,1] >= y_vals[0])##check y overlap with previous bounding box,       #top right point y val in top_box defined by [1,1]
+            if debug == True:
+                print(f"line overlap = ({top_bbox[0,1]} >= {y_vals[0]}")
+                print(f"line x_vals, y_vals: {x_vals, y_vals}")
+            if line_overlap: #if the top of the prev bbox overlaps with the current line, move the current line up to ABOVE top bbox
+                y_vals = get_sig_bar_y_vals(top_bbox[1,1]+offset_constant,line_height)             ## if overlaps with previous bounding box, adjust height by N
 
-## functinos
+            text_x = (x_vals[0]+ x_vals[2])*.5
+            text_y = y_vals[1] + star_space_to_line#what linear amount to separate star from line, in AX FRACTION AMOUNT 
+            #plot sig star over line
+            ax_input.plot(x_vals, y_vals, lw=annotator_default['line_width'], color = 'black', transform = trans, clip_on = False)
+            star_annot = ax_input.annotate(convert_pvalue_to_asterisks(comp.pvalue), xy = (text_x, text_y), xycoords = ('data', 'axes fraction'),
+                            ha='center', va='baseline', fontsize = 'x-small',fontweight = 'light')# bbox = {'boxstyle': 'Square, pad = 0.0', 'fc': 'lightblue', 'lw': 0})
+            bbox_in_ax = ax_input.transAxes.inverted().transform(star_annot.get_window_extent()) #Get the artist's bounding box in display space.
+            # ax.transData.inverted() is a matplotlib.transforms.Transform that goes from display coordinates to data coordinates
+            top_bbox = bbox_in_ax      #detect overlap by storing, then comparing ot previous versions
+
+
+
+
+
+###############
+###############
+##DEPRECATED, DEFAULT TO USING THE TIGHT VERSION
+## main stat annotation function- no alterations possible NOW DEFUNCT
+def plot_sig_bars_w_comp_df(ax_input, sig_comp_df, direction_to_plot = None):
+    """ 
+    Plot significance bars with comparison dataframe.
+
+    Parameters:
+    ax_input (matplotlib.axes.Axes): The input axis object.
+    sig_comp_df (pandas.DataFrame): DataFrame with significance comparisons.
+    direction_to_plot (str, optional): Direction to plot ('top_down', 'bottom_up'). Defaults to 'bottom_up'.
+ TO- given parameters, plot vertical lines between centers of datapoints of interest (pre-sorted), with significance star (pre-calculated)"""
+    ## plotting params
+    if direction_to_plot is None:#set direction to plot ('top_down', 'bottom_up')
+        direction_to_plot = 'bottom_up'
+
+    line_height = 1.01
+    offset_constant = 0.025 #what linear amount to add
+    star_space_to_line = offset_constant/5
+    trans = matplotlib.transforms.blended_transform_factory(x_transform = ax_input.transData,y_transform = ax_input.transAxes)# the x coords of this transformation are data, and the y coord are axes
+    ## main loop over categorical ticks
+    for cat in sig_comp_df.category_compared_within:#iterate over each categorical tick value
+        top_bbox = np.array([[0, 0],[0, 0]])#initialize box location for comparison # =[lower_x, lower_y] [upper_x, upper_y]
+        for comp in sig_comp_df.loc[sig_comp_df.category_compared_within == cat,:].itertuples():
+            x_vals = get_sig_bar_x_vals(comp) # [comp.g1_cat_loc, comp.g1_cat_loc, comp.g2_cat_loc, comp.g2_cat_loc]# list the 4 x coord for points that define the line
+            y_vals =get_sig_bar_y_vals(0.95,line_height) #  [comp.max_group_loc_val, comp.max_group_loc_val * h, comp.max_group_loc_val * h, comp.max_group_loc_val] # list 4 y coord for points that define the line
+            line_overlap = (top_bbox[0,1] >= y_vals[0])##check overlap with previous bounding box
+            if line_overlap: #if the top of the prev bbox overlaps with the current line, move the current line up to ABOVE top bbox
+                y_vals = get_sig_bar_y_vals(top_bbox[1,1]+offset_constant,line_height)             ## if overlaps with previous bounding box, adjust height by N
+            text_x = (x_vals[0]+ x_vals[2])*.5
+            text_y = y_vals[1] + star_space_to_line
+            #plot sig star over line
+            ax_input.plot(x_vals, y_vals, lw=annotator_default['line_width'], color = 'black', transform = trans, clip_on = False)
+            star_annot = ax_input.annotate(convert_pvalue_to_asterisks(comp.pvalue), xy = (text_x, text_y), xycoords = ('data', 'axes fraction'),
+                            ha='center', va='baseline', fontsize = 'small',)# bbox = {'boxstyle': 'Square, pad = 0.0', 'fc': 'lightblue', 'lw': 0})
+            bbox_in_ax = ax_input.transAxes.inverted().transform(star_annot.get_window_extent()) # to get ax coordinates of bounding box (transform from  Return the Bbox bounding the text, in display units.)
+            top_bbox = bbox_in_ax      #detect overlap by storing, then comparing ot previous versions
+
+
+## test running functinos
 #common error- ValueError: Cannot set a DataFrame with multiple columns to the single column g1_num_loc- this is if you mistype the hue value or you use the wrong version of SNS 
 def main_run_posthoc_tests_and_get_hue_loc_df(ax_input, plot_params, plot_obj, preset_comparisons,
                                                hue_var= None, test_name = None, hue_order = None, ax_var_is_hue=False):
@@ -51,7 +164,7 @@ def main_run_posthoc_tests_and_get_hue_loc_df(ax_input, plot_params, plot_obj, p
     return posthoc_df
 ## ad hue vs ax order 
 def run_posthoc_tests_on_all_ax_ticks(plot_data, plot_obj, comparison_list, ax_grouping_col, group_order, hue_col_name, value_col_name,
-                                      test_name = None, ax_var_is_hue = False):
+                                      test_name = None, ax_var_is_hue = False, detect_error_bar = False):
     """ 
     Run posthoc tests on all axis ticks.
 
@@ -66,12 +179,13 @@ def run_posthoc_tests_on_all_ax_ticks(plot_data, plot_obj, comparison_list, ax_g
     test_name (str, optional): The name of the test. Defaults to 'MWU'.
     ax_var_is_hue (bool, optional): Whether the axis variable is the hue. Defaults to False.
 
-    Returns:
-    pandas.DataFrame: DataFrame with posthoc test results.
+        Returns: pandas.DataFrame: DataFrame with posthoc test results.
     """
     if test_name is None:
         test_name = 'MWU'
-   
+    if detect_error_bar:
+        print('Error bar detected, using MWU test')
+        test_name = 'MWU'
     compare_stats_df = []
     #if the ax levels = the hue levels, don't filter the plot data by what ax group col you're on
     if ax_var_is_hue:
@@ -91,6 +205,7 @@ def run_posthoc_tests_on_all_ax_ticks(plot_data, plot_obj, comparison_list, ax_g
                                                                     hue_col_name, value_col_name,test_name = test_name)
                 compare_stats_df.append(posthoc_output)
     stat_table = pd.DataFrame.from_records(compare_stats_df)
+    # after producing stat result table, merge with df of x tick labels and their positions
     if not(ax_var_is_hue):#transform list of xticklabels to pandas df and merge ## inserted 10.16.24- automerge the xticks
         stat_table = stat_table.merge(get_x_ticks_as_df(plot_obj.get_xticklabels()), left_on = 'category_compared_within', right_on = 'tick_text') 
     return stat_table
@@ -99,10 +214,10 @@ def run_posthoc_tests_on_all_ax_ticks(plot_data, plot_obj, comparison_list, ax_g
 def run_posthoc_test_on_tick_hue_groups(ax_tick_data, hue_group_1, hue_group_2, ax_category_level,group_order,
                                          hue_col_name, value_cols_name,test_name = None,ax_var_is_hue = False):
     """ 
-    Run posthoc test on tick hue groups.
+    Run posthoc test on tick hue groups. Use existing dataframe filtered by the current axis levels, and perform stats on the hue groups.
 
     Parameters:
-    ax_tick_data (pandas.DataFrame): The axis tick data.
+    ax_tick_data (pandas.DataFrame): The axis tick corresponding dataframe.
     hue_group_1 (str): The first hue group.
     hue_group_2 (str): The second hue group.
     ax_category_level (str): The axis category level.
@@ -118,13 +233,14 @@ def run_posthoc_test_on_tick_hue_groups(ax_tick_data, hue_group_1, hue_group_2, 
     ##define test to run
     if test_name is None:
         test_name = 'MWU'
-    ## extract groups
+    ## extract groups from the dataframe containing data corresponding to the ax tick in question
     # ax_tick_data =plot_data.loc[plot_data[ax_grouping_col] ==  ax_category_level,:]
     data_group_1= ax_tick_data.loc[ax_tick_data[hue_col_name] == hue_group_1,:]
     data_group_2= ax_tick_data.loc[ax_tick_data[hue_col_name] == hue_group_2,:]
     ## get values from each grup
     data_group_1_values = data_group_1[value_cols_name].values
     data_group_2_values =data_group_2[value_cols_name].values
+    ## run stats on group values
     result_dict = get_pair_stat_test_result(test_name, ax_category_level,group_order, hue_group_1, hue_group_2, data_group_1_values,data_group_2_values,ax_var_is_hue)
     return result_dict
     
@@ -186,10 +302,10 @@ def get_pair_stat_test_result(test_name, ax_category_level,group_order, group_1_
     return result_dict
     ## build custom plotting ufnction
 
-def get_hue_loc_on_axis(hue_loc_df, posthoc_df):
+def get_hue_loc_on_axis(hue_loc_df, posthoc_df, detect_error_bar = False): 
     """ 
-    Add numerical and categorical axis locations to the posthoc comparison dataframe.
-
+    Add numerical and categorical axis locations to the posthoc comparison dataframe. Main function creating/label numeric loc on axis 
+    NEW (2.6.25)- add detect errorbar  to automatically detect errorbar, and move point marked for symbol loc if so 
     Parameters:
     hue_loc_df (pandas.DataFrame): DataFrame with hue locations.
     posthoc_df (pandas.DataFrame): DataFrame with posthoc comparisons.
@@ -422,110 +538,4 @@ def get_sig_bar_y_vals(bottom_val = None, line_height= 1.01):
     return y_vals
 
 #NEW sig bar plotting function
-## bottom up, but starting from close above points
-def plot_sig_bars_w_comp_df_tight(ax_input, sig_comp_df, direction_to_plot = None, tight = None, tight_offset = None, offset_constant=None, debug = None):
-    """ 
-    Plot significance bars with comparison dataframe, using a tight layout.
-    TO- given parameters, plot vertical lines between centers of datapoints of interest (pre-sorted), with significance star (pre-calculated)
-    Parameters
-    ax_input (matplotlib.axes.Axes): The input axis object.
-    sig_comp_df (pandas.DataFrame): DataFrame with significance comparisons.
-    direction_to_plot (str, optional): Direction to plot ('top_down', 'bottom_up'). Defaults to 'bottom_up'.
-    tight (bool, optional): Whether to plot bars right above their corresponding values. Defaults to True.
-    tight_offset (float, optional): Offset for tight layout. Defaults to 0.075.
-    offset_constant (float, optional): Constant for offset. Defaults to 0.0225.
-    debug (bool, optional): Whether to print debug information. Defaults to None.
-    """
-    ## plotting params    #set direction to plot ('top_down', 'bottom_up') #set whether bars are plotted right above their coresponding values, or not
-    #declare initial transforms of interest
-    transform_ax_to_data = ax_input.transAxes + ax_input.transData.inverted() #create ax-display + display-data pipe
-    transform_data_to_ax = transform_ax_to_data.inverted() # 
-    #default vcalues
-    if direction_to_plot is None:
-        direction_to_plot = 'bottom_up'
-        line_start_y_pos = 0.8 #base case- plot upwards from 0.8 of ax size 
-    if tight is None:
-        tight = True #set whether or not to plot bars RIGHT above datapoints
-    if tight_offset is None:
-        tight_offset = 0.075 #fraction of ax to put between the point of interest and the line of sig post-hoc
-    #params for offsetting
-    line_height = 1.00 #base case- 1.01
-    if offset_constant is None:
-        offset_constant = 0.0225 #what linear amount to add, in AX FRACTION AMOUNT 
-    
-    star_space_to_line = offset_constant*0.1
-    if debug == True:
-        print(f'tight format, max_numeric_ax_value = {max_numeric_ax_value}.  start y val  = {line_start_y_pos}')
-        #transData transforms: (DATA) -> (DISPLAY COORDINATES)     # transAxes transforms (AXES) -> (DISPLAY)     #all transforms -> display coords 
-    trans = matplotlib.transforms.blended_transform_factory(x_transform = ax_input.transData,
-                                                            y_transform = ax_input.transAxes)# the x coords of this transformation are data, and the y coord are axes
-    ## main loop over categorical ticks, bottom up approach 
-    for cat in sig_comp_df.category_compared_within.unique():#iterate over each categorical tick value
-        top_bbox = np.array([[0, 0],[0, 0]])#initialize box location for comparison # =[lower_x, lower_y] [upper_x, upper_y]
-        #get max y position value for each category you're doing post-hoc comparisons within
-        sig_comp_category = sig_comp_df.loc[sig_comp_df.category_compared_within == cat,:]
-        if tight:
-            max_numeric_ax_value = sig_comp_category.loc[:, ['g1_num_loc','g2_num_loc']].max().values.max()    #get max val in the group of interest you're running posthocs on (x ticks of interest)    
-            line_start_y_pos = transform_data_to_ax.transform((0,max_numeric_ax_value))[1]+tight_offset # data -> axes 
-            if debug == True:
-                print(f'tight format, max_numeric_ax_value = {max_numeric_ax_value}.  start y val  = {line_start_y_pos}')
-            #transData transforms: (DATA) -> (DISPLAY COORDINATES)     # transAxes transforms (AXES) -> (DISPLAY)     
-        for comp in sig_comp_category.itertuples():
-            x_vals = get_sig_bar_x_vals(comp) # [comp.g1_cat_loc, comp.g1_cat_loc, comp.g2_cat_loc, comp.g2_cat_loc]# list the 4 x coord for points that define the line
-            y_vals =get_sig_bar_y_vals(line_start_y_pos,line_height) #  [comp.max_group_loc_val, comp.max_group_loc_val * h, comp.max_group_loc_val * h, comp.max_group_loc_val] # list 4 y coord for points that define the line
-            #compare overlap of proposed y values, in data space 
-            line_overlap = (top_bbox[1,1] >= y_vals[0])##check y overlap with previous bounding box,       #top right point y val in top_box defined by [1,1]
-            if debug == True:
-                print(f"line overlap = ({top_bbox[0,1]} >= {y_vals[0]}")
-                print(f"line x_vals, y_vals: {x_vals, y_vals}")
-            if line_overlap: #if the top of the prev bbox overlaps with the current line, move the current line up to ABOVE top bbox
-                y_vals = get_sig_bar_y_vals(top_bbox[1,1]+offset_constant,line_height)             ## if overlaps with previous bounding box, adjust height by N
-
-            text_x = (x_vals[0]+ x_vals[2])*.5
-            text_y = y_vals[1] + star_space_to_line#what linear amount to separate star from line, in AX FRACTION AMOUNT 
-            #plot sig star over line
-            ax_input.plot(x_vals, y_vals, lw=annotator_default['line_width'], color = 'black', transform = trans, clip_on = False)
-            star_annot = ax_input.annotate(convert_pvalue_to_asterisks(comp.pvalue), xy = (text_x, text_y), xycoords = ('data', 'axes fraction'),
-                            ha='center', va='baseline', fontsize = 'x-small',fontweight = 'light')# bbox = {'boxstyle': 'Square, pad = 0.0', 'fc': 'lightblue', 'lw': 0})
-            bbox_in_ax = ax_input.transAxes.inverted().transform(star_annot.get_window_extent()) #Get the artist's bounding box in display space.
-            # ax.transData.inverted() is a matplotlib.transforms.Transform that goes from display coordinates to data coordinates
-            top_bbox = bbox_in_ax      #detect overlap by storing, then comparing ot previous versions
-
-
-## main stat annotation function- no alterations possible NOW DEFUNCT
-def plot_sig_bars_w_comp_df(ax_input, sig_comp_df, direction_to_plot = None):
-    """ 
-    Plot significance bars with comparison dataframe.
-
-    Parameters:
-    ax_input (matplotlib.axes.Axes): The input axis object.
-    sig_comp_df (pandas.DataFrame): DataFrame with significance comparisons.
-    direction_to_plot (str, optional): Direction to plot ('top_down', 'bottom_up'). Defaults to 'bottom_up'.
-    """
-    """ TO- given parameters, plot vertical lines between centers of datapoints of interest (pre-sorted), with significance star (pre-calculated)"""
-    ## plotting params
-    if direction_to_plot is None:#set direction to plot ('top_down', 'bottom_up')
-        direction_to_plot = 'bottom_up'
-
-    line_height = 1.01
-    offset_constant = 0.025 #what linear amount to add
-    star_space_to_line = offset_constant/5
-    trans = matplotlib.transforms.blended_transform_factory(x_transform = ax_input.transData,y_transform = ax_input.transAxes)# the x coords of this transformation are data, and the y coord are axes
-    ## main loop over categorical ticks
-    for cat in sig_comp_df.category_compared_within:#iterate over each categorical tick value
-        top_bbox = np.array([[0, 0],[0, 0]])#initialize box location for comparison # =[lower_x, lower_y] [upper_x, upper_y]
-        for comp in sig_comp_df.loc[sig_comp_df.category_compared_within == cat,:].itertuples():
-            x_vals = get_sig_bar_x_vals(comp) # [comp.g1_cat_loc, comp.g1_cat_loc, comp.g2_cat_loc, comp.g2_cat_loc]# list the 4 x coord for points that define the line
-            y_vals =get_sig_bar_y_vals(0.95,line_height) #  [comp.max_group_loc_val, comp.max_group_loc_val * h, comp.max_group_loc_val * h, comp.max_group_loc_val] # list 4 y coord for points that define the line
-            line_overlap = (top_bbox[0,1] >= y_vals[0])##check overlap with previous bounding box
-            if line_overlap: #if the top of the prev bbox overlaps with the current line, move the current line up to ABOVE top bbox
-                y_vals = get_sig_bar_y_vals(top_bbox[1,1]+offset_constant,line_height)             ## if overlaps with previous bounding box, adjust height by N
-            text_x = (x_vals[0]+ x_vals[2])*.5
-            text_y = y_vals[1] + star_space_to_line
-            #plot sig star over line
-            ax_input.plot(x_vals, y_vals, lw=annotator_default['line_width'], color = 'black', transform = trans, clip_on = False)
-            star_annot = ax_input.annotate(convert_pvalue_to_asterisks(comp.pvalue), xy = (text_x, text_y), xycoords = ('data', 'axes fraction'),
-                            ha='center', va='baseline', fontsize = 'small',)# bbox = {'boxstyle': 'Square, pad = 0.0', 'fc': 'lightblue', 'lw': 0})
-            bbox_in_ax = ax_input.transAxes.inverted().transform(star_annot.get_window_extent()) # to get ax coordinates of bounding box (transform from  Return the Bbox bounding the text, in display units.)
-            top_bbox = bbox_in_ax      #detect overlap by storing, then comparing ot previous versions
 
