@@ -5,6 +5,13 @@ from helper_functions import *
 import scipy
 from scipy import stats
 from stat_tests import * 
+import warnings
+from typing import List, Optional, Union
+
+import matplotlib.pyplot as plt
+import matplotlib.transforms as mtransforms
+import numpy as np
+import seaborn as sns
 
 ## plotting functions
 ## bottom up, but starting from close above points
@@ -332,6 +339,104 @@ def get_hue_loc_on_axis(hue_loc_df, posthoc_df, detect_error_bar = False):
     posthoc_df['max_group_loc_val'] = posthoc_df[['g1_num_loc', 'g2_num_loc']].max(axis = 1)
     return posthoc_df 
 
+
+##HELPER FUNCTIONS
+##get information about hue locs 
+def get_hue_point_loc_df(ax_input, hue_order):
+    """ 
+    Get a DataFrame of the datapoints at each level of the hue variable.
+
+    Parameters:
+    ax_input (matplotlib.axes.Axes): The input axis object.
+    hue_order (list): The order of the hue.
+
+    Returns:
+    pandas.DataFrame: DataFrame with hue point locations.
+    """
+    hue_loc_df = pd.DataFrame.from_dict(get_hue_point_loc_dict(ax_input, hue_order)).set_index('hue') #get array of numerical points and values for each hue level
+    return hue_loc_df
+
+def get_hue_errorbar_loc_dict(ax_input, hue_order):
+    """ 
+    Get a dictionary of the data errorbars at each level of the hue variable.
+
+    Parameters:
+    ax_input (matplotlib.axes.Axes): The input axis object.
+    hue_order (list): The order of the hue in a list.
+
+    Returns:
+    dict: Dictionary with hue errorbar  locations.
+    """
+    hue_point_loc_dict = [{'hue': hue_order[count],
+                            'data_locs':x.get_offsets().data} for count, x in enumerate(ax_input.collections)]
+    return hue_point_loc_dict
+
+    
+def get_hue_point_loc_dict(ax_input, hue_order):
+    """ 
+    Get a dictionary of the datapoints at each level of the hue variable.
+
+    Parameters:
+    ax_input (matplotlib.axes.Axes): The input axis object.
+    hue_order (list): The order of the hue.
+
+    Returns:
+    dict: Dictionary with hue point locations.
+    """
+    hue_point_loc_dict = [{'hue': hue_order[count], 'data_locs':x.get_offsets().data} for count, x in enumerate(ax_input.collections)]
+    return hue_point_loc_dict
+
+def get_x_ticks_as_df(ticklabel_obj):
+    """ 
+    Get a DataFrame of the x-tick labels and their positions.
+
+    Parameters:
+    ticklabel_obj (list): List of tick label objects.
+
+    Returns:
+    pandas.DataFrame: DataFrame with x-tick labels and positions.
+    """
+    ticks_df = pd.DataFrame.from_records([{'tick_text':x.get_text(), 'tick_pos': x.get_position()} for x in ticklabel_obj])
+    return ticks_df
+ 
+
+def get_sig_bar_x_vals(comparison_tuple):
+    """ 
+    Get the x-values for the significance bar.
+
+    Parameters:
+    comparison_tuple (namedtuple): Tuple with comparison information.
+
+    Returns:
+    list: List of x-values for the significance bar.
+    """
+    x_vals = [comparison_tuple.g1_cat_loc, comparison_tuple.g1_cat_loc,
+              comparison_tuple.g2_cat_loc, comparison_tuple.g2_cat_loc]# list the 4 x coord for points that define the line
+    return x_vals
+
+def get_sig_bar_y_vals(bottom_val = None, line_height= 1.01):
+    """ 
+    Get the y-values for the significance bar.
+
+    Parameters:
+    bottom_val (float, optional): The bottom value for the bar. Defaults to 0.95.
+    line_height (float, optional): The height of the line. Defaults to 1.01.
+
+    Returns:
+    list: List of y-values for the significance bar.
+    """
+    """ comparison tuple max y value is multipled by offset factor"""
+    if bottom_val is None:
+        bottom_val = 0.95 #for ax relative point plotting
+    # bottom_val = comparison_tuple.max_group_loc_val * offset_factor #for data point plotting
+    y_vals = [bottom_val,bottom_val* line_height, bottom_val*line_height,bottom_val]# list the 4 x coord for points that define the line
+    return y_vals
+
+#NEW sig bar plotting function
+
+
+
+
 # def main_run_posthoc_tests_and_get_hue_loc_df(ax_input, plot_params, plot_obj, preset_comparisons,
 #                                                hue_var= None, test_name = None, hue_order = None, ax_var_is_hue=False):
 #     """ TO, 1) run posthoc test on all ax ticks, 2) get hue levels for each ax tick, 3) join this to df produced in 1"""
@@ -460,82 +565,3 @@ def get_hue_loc_on_axis(hue_loc_df, posthoc_df, detect_error_bar = False):
 #     posthoc_df['max_group_loc_val'] = posthoc_df[['g1_num_loc', 'g2_num_loc']].max(axis = 1)
 #     return posthoc_df 
 #verify what order to use for this to make sure alignment of geno_order and collecions/hue levels
-
-##HELPER FUNCTIONS
-##get information about hue locs 
-def get_hue_point_loc_df(ax_input, hue_order):
-    """ 
-    Get a DataFrame of the datapoints at each level of the hue variable.
-
-    Parameters:
-    ax_input (matplotlib.axes.Axes): The input axis object.
-    hue_order (list): The order of the hue.
-
-    Returns:
-    pandas.DataFrame: DataFrame with hue point locations.
-    """
-    hue_loc_df = pd.DataFrame.from_dict(get_hue_point_loc_dict(ax_input, hue_order)).set_index('hue') #get array of numerical points and values for each hue level
-    return hue_loc_df
-
-def get_hue_point_loc_dict(ax_input, hue_order):
-    """ 
-    Get a dictionary of the datapoints at each level of the hue variable.
-
-    Parameters:
-    ax_input (matplotlib.axes.Axes): The input axis object.
-    hue_order (list): The order of the hue.
-
-    Returns:
-    dict: Dictionary with hue point locations.
-    """
-    hue_point_loc_dict = [{'hue': hue_order[count], 'data_locs':x.get_offsets().data} for count, x in enumerate(ax_input.collections)]
-    return hue_point_loc_dict
-
-def get_x_ticks_as_df(ticklabel_obj):
-    """ 
-    Get a DataFrame of the x-tick labels and their positions.
-
-    Parameters:
-    ticklabel_obj (list): List of tick label objects.
-
-    Returns:
-    pandas.DataFrame: DataFrame with x-tick labels and positions.
-    """
-    ticks_df = pd.DataFrame.from_records([{'tick_text':x.get_text(), 'tick_pos': x.get_position()} for x in ticklabel_obj])
-    return ticks_df
- 
-
-def get_sig_bar_x_vals(comparison_tuple):
-    """ 
-    Get the x-values for the significance bar.
-
-    Parameters:
-    comparison_tuple (namedtuple): Tuple with comparison information.
-
-    Returns:
-    list: List of x-values for the significance bar.
-    """
-    x_vals = [comparison_tuple.g1_cat_loc, comparison_tuple.g1_cat_loc,
-              comparison_tuple.g2_cat_loc, comparison_tuple.g2_cat_loc]# list the 4 x coord for points that define the line
-    return x_vals
-
-def get_sig_bar_y_vals(bottom_val = None, line_height= 1.01):
-    """ 
-    Get the y-values for the significance bar.
-
-    Parameters:
-    bottom_val (float, optional): The bottom value for the bar. Defaults to 0.95.
-    line_height (float, optional): The height of the line. Defaults to 1.01.
-
-    Returns:
-    list: List of y-values for the significance bar.
-    """
-    """ comparison tuple max y value is multipled by offset factor"""
-    if bottom_val is None:
-        bottom_val = 0.95 #for ax relative point plotting
-    # bottom_val = comparison_tuple.max_group_loc_val * offset_factor #for data point plotting
-    y_vals = [bottom_val,bottom_val* line_height, bottom_val*line_height,bottom_val]# list the 4 x coord for points that define the line
-    return y_vals
-
-#NEW sig bar plotting function
-
