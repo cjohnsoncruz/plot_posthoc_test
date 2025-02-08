@@ -14,6 +14,103 @@ import numpy as np
 import seaborn as sns
 
 ## plotting functions
+
+## child based functions-
+def check_if_row_has_nan(input_array):
+    return np.any(np.isnan(input_array),axis = 1)
+
+def get_ax_children_types(ax_obj):
+    ''' To- return list stating what type each child of the mplt ax object is'''
+    return [type(x) for x in ax_obj.get_children()]
+
+path_collection_type = matplotlib.collections.PathCollection
+line_type = matplotlib.lines.Line2D
+
+def return_ax_child_line_coor(ax_childs, ax_child_points_index):
+    ''' Given a set of indices of the ax child objects between which to query (e.g. path collections index), find fully nonnan yvals in the lines (corresponding to the actual real vertical errorbar) and return coords'''
+    #get errorbar lims via #get non nan values
+    ci_info = []
+    for count, i in enumerate(ax_child_points_index):
+        #get range around points, looking back  
+        if count == 0:
+            range_start = 0
+        else: 
+            range_start = ax_child_points_index[count-1]+1
+        range_end = i
+        # main body
+        child_range = ax_childs[range_start: range_end] #create list of ax children instances
+        #store each entry in a list of 1 dict per line obj 
+        cis = [{'child_index': count + range_start ,
+                'child_x':np.round(x.get_xdata(),decimals = 2),
+                'child_y':x.get_ydata(),
+               'next_collection_index': i} for count, x in enumerate(child_range)] #each child N gets a dict N with information
+        child = pd.DataFrame.from_records(cis)
+        ci_info.append(child)
+    # ci_x = [x.get_xdata() for x in child_range] # ci_y = [x.get_ydata() for x in child_range] #old way of getting x values
+    #NEW LOGIC- drop nan rows (as those arne't real lines)
+    coords = pd.concat(ci_info).reset_index()
+    coords['y_is_nonnan'] = coords.child_y.apply(lambda x: np.logical_not(np.any(np.isnan(x))))
+    coords['y_is_2_elem'] = coords.child_y.apply(lambda x:x.size == 2)
+    drop_nan_row= True
+    if drop_nan_row:
+        coords= coords[coords['y_is_nonnan']]
+    return coords
+
+# def return_point_in_one_sample():#THIS ONLY WORKS WITH 1 VALUEs
+#     ci_nonnan_index = [count for count, x in enumerate([np.any(x) for x in np.isnan(ci_y)]) if x == False][0] #errorbar is entry with 0 nan values
+#     #store as dict for transform in to df
+#     curr_ci = {'ci_index': ci_nonnan_index + range_start, 'ci_xvals': ci_x[ci_nonnan_index], 'ci_yvals': ci_y[ci_nonnan_index] }
+#     ci_info.append(curr_ci)
+#     return pd.DataFrame.from_records(ci_info)
+
+def is_val_between_range_min_max(value, range_array):
+    ''' smple function'''
+    is_lessthan_max = value < np.max(range_array)
+    is_greaterthan_min = value> np.min(range_array)
+    return is_lessthan_max & is_greaterthan_min
+# Created more efficient version, defunct
+# def get_errorbar_span_of_hue_loc(hue_point_x_loc, hue_point_y_loc, ax_child_df, size_match = 2):
+#     '''checks 4 things: 1-2) is test_y value bewteen min/max of a line's span 3) is a row size == 2 [meaning probably line] and 4) is hue loc in a given ax child's x value'''
+    
+#     is_size_match = ax_child_df.y_is_2_elem #use pre-build bool
+#     is_in_child_x_vals = test_val in ax_child_df.child_x
+#     #if match first 2 vec, investigate w third
+#     is_hue_point_in_range_bounds = is_val_between_range_min_max(hue_point_y_loc ,ax_child_df.child_y)
+#     all_match = is_in_child_x_vals & is_size_match & is_hue_point_in_range_bounds
+#     return all_match
+
+def get_child_df_row(hue_cat_loc,hue_num_loc, bar_coords):
+    ''' non vectorized function relying on vectorized subfuunctions'''
+    ##run comparisons to get bool
+    is_size_match = bar_coords.y_is_2_elem# print(is_size_match)
+    is_in_child_x_vals = bar_coords.apply(lambda x:np.round(hue_cat_loc,decimals = 2) in x.child_x,axis = 1)
+    is_hue_point_in_range_bounds = bar_coords.apply(lambda x: is_val_between_range_min_max(hue_num_loc,x.child_y),axis = 1)
+    #these need to iterate over entire DF to get complete bool made
+    bar_row_bool = is_hue_point_in_range_bounds & bar_coords.y_is_2_elem & is_in_child_x_vals
+    row_match = bar_coords[bar_row_bool].drop(['index','next_collection_index', 'child_index'],axis = 1)
+    return row_match
+
+def add_errorbar_loc_on_posthoc(posthoc_df, bar_coords, overwrite_num_loc= True):
+    ''' merges posthoc df with newly created errorbar span detection '''
+    error_rows = []
+    success_rows = []
+    for row in posthoc_df.itertuples():
+        group_info = row.g1_num_loc#=14.125, g2_num_loc=13.5, g1_cat_loc=-0.2, g2_cat_loc=-0.1, max_group_loc_val=14.125
+        # print(row.g1_cat_loc, row.g1_num_loc,row.g2_cat_loc, row.g2_num_loc)
+        g1_row_match = get_child_df_row(row.g1_cat_loc, row.g1_num_loc, bar_coords).assign(**{'g1_cat_loc':row.g1_cat_loc, 'g1_num_loc': row.g1_num_loc}).rename({x: "_".join(["g_1",x])for x in ['child_x','child_y']},axis = 1)
+        g2_row_match = get_child_df_row(row.g2_cat_loc, row.g2_num_loc, bar_coords).assign(**{'g2_cat_loc':row.g2_cat_loc, 'g2_num_loc': row.g2_num_loc}).rename({x: "_".join(["g_2",x])for x in ['child_x','child_y']},axis = 1)
+        success_rows.append(pd.concat([g1_row_match.reset_index(drop=True), g2_row_match[g2_row_match.columns.difference(g1_row_match.columns)].reset_index(drop=True)],axis = 1))
+        if (g1_row_match.size == 0) |(g2_row_match.size == 0) :
+            error_rows.append(row.Index)
+    ebar_loc = pd.concat(success_rows)
+    assert (len(error_rows)==0), f" len {error_rows} of error rows list"
+    posthoc_df = posthoc_df.merge(ebar_loc, how = 'left', on = ['g1_num_loc', 'g2_num_loc', 'g1_cat_loc', 'g2_cat_loc'])
+    if overwrite_num_loc:
+        posthoc_df.loc[:, 'g1_num_loc'] = posthoc_df.apply(lambda x: x['g_1_child_y'].max(),axis = 1)
+        posthoc_df.loc[:, 'g2_num_loc'] = posthoc_df.apply(lambda x: x['g_2_child_y'].max(),axis = 1)
+    return posthoc_df
+
+
 ## bottom up, but starting from close above points
 def plot_sig_bars_w_comp_df_tight(ax_input, sig_comp_df, direction_to_plot = None, tight = None, tight_offset = None, offset_constant=None, debug = None):
     """ 
@@ -130,7 +227,7 @@ def plot_sig_bars_w_comp_df(ax_input, sig_comp_df, direction_to_plot = None):
 ## test running functinos
 #common error- ValueError: Cannot set a DataFrame with multiple columns to the single column g1_num_loc- this is if you mistype the hue value or you use the wrong version of SNS 
 def main_run_posthoc_tests_and_get_hue_loc_df(ax_input, plot_params, plot_obj, preset_comparisons,
-                                               hue_var= None, test_name = None, hue_order = None, ax_var_is_hue=False):
+                                               hue_var= None, test_name = None, hue_order = None, ax_var_is_hue=False,detect_error_bar = False):
     """ 
     Run posthoc tests on all axis ticks, get hue levels for each axis tick, and join this to the dataframe produced.
 
@@ -168,10 +265,17 @@ def main_run_posthoc_tests_and_get_hue_loc_df(ax_input, plot_params, plot_obj, p
     if ax_var_is_hue: #you will use this to find the ordering of the hue collection points of interest
         posthoc_df['category_compared_within']= plot_params['x']
     
+    if detect_error_bar: #NEW_ add errorbar locs to posthoc df
+        
+        print('Error bar detected, moving bounds')
+        ax_childs =plot_obj.get_children()
+        ax_child_points_index = [count for count, x in enumerate( get_ax_children_types(plot_obj)) if x is path_collection_type]
+        bar_coords =  return_ax_child_line_coor(ax_childs,ax_child_points_index)
+        posthoc_df =add_errorbar_loc_on_posthoc(posthoc_df, bar_coords)
     return posthoc_df
 ## ad hue vs ax order 
 def run_posthoc_tests_on_all_ax_ticks(plot_data, plot_obj, comparison_list, ax_grouping_col, group_order, hue_col_name, value_col_name,
-                                      test_name = None, ax_var_is_hue = False, detect_error_bar = False):
+                                      test_name = None, ax_var_is_hue = False):
     """ 
     Run posthoc tests on all axis ticks.
 
@@ -190,9 +294,7 @@ def run_posthoc_tests_on_all_ax_ticks(plot_data, plot_obj, comparison_list, ax_g
     """
     if test_name is None:
         test_name = 'MWU'
-    if detect_error_bar:
-        print('Error bar detected, using MWU test')
-        test_name = 'MWU'
+    
     compare_stats_df = []
     #if the ax levels = the hue levels, don't filter the plot data by what ax group col you're on
     if ax_var_is_hue:
