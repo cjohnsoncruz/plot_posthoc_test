@@ -1,8 +1,9 @@
-[plot_posthoc_test]
+[tool.poetry]
 name = "plot_posthoc_test"
 version = "0.1.0"
 description = "A project for plotting post hoc test results"
 authors = ["Carlos Johnson-Cruz <cjohnsoncruz@gmail.com>"]
+packages = [{ include = "plot_posthoc_test", from = "src" }]
 
 [tool.poetry.dependencies]
 python = "^3.8"
