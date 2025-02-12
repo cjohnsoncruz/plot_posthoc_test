@@ -11,3 +11,7 @@ This module includes utilities for:
 - Annotating plots with significance bars/stars bewteen groups with p-values below 0.05.
 - Determining hue groups and their locations on plots.
 - Detecting and adjusting significance bars based on the presence of error bars in plots.
+
+  ### API info:
+
+  See [API resource here](https://cjohnsoncruz.github.io/plot_posthoc_test/api/)
