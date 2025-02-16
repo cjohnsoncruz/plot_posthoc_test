@@ -11,3 +11,26 @@ This module includes utilities for:
 - Annotating plots with significance bars/stars bewteen groups with p-values below 0.05.
 - Determining hue groups and their locations on plots.
 - Detecting and adjusting significance bars based on the presence of error bars in plots.
+
+<details open>
+<summary>Sample code with scikit-learn</summary>
+
+```python
+import ...
+# plot 
+posthoc_df = main_run_posthoc_tests_and_get_hue_loc_df(plot_ax, plot_params, ax_object, comparison_list, test_name = 'MWU',ax_var_is_hue=False, detect_error_bar = True)
+plot_sig_bars_w_comp_df_tight(plot_ax, posthoc_df[posthoc_df['pvalue'] < 0.05], tight_offset = 0.05) 
+``` 
+</details>
+
+## Installation
+
+plot_posthoc_test is currently only available via github. Python Package Index upload is expected Q2 2025.
+
+## Communication
+
+- [GitHub Discussions] for questions.
+- [GitHub Issues] for bug reports and feature requests.
+
+[GitHub Discussions]: https://github.com/cjohnsoncruz/plot_posthoc_test/discussions
+[GitHub issues]: https://github.com/cjohnsoncruz/plot_posthoc_test/issues
