@@ -34,3 +34,6 @@ plot_posthoc_test is currently only available via github. Python Package Index u
 
 [GitHub Discussions]: https://github.com/cjohnsoncruz/plot_posthoc_test/discussions
 [GitHub issues]: https://github.com/cjohnsoncruz/plot_posthoc_test/issues
+  ### API info:
+
+  See [API resource here](https://cjohnsoncruz.github.io/plot_posthoc_test/api/)
