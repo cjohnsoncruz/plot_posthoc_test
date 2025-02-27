@@ -382,16 +382,22 @@ def get_pair_stat_test_result(test_name, ax_category_level,group_order, group_1_
             stat_result = stats.mannwhitneyu(data_group_1_values, data_group_2_values)
     elif test_name == 'bootstrap_sdev_overlap':
             stat_result = test_group_mean_separation(data_group_1_values, data_group_2_values)
+    elif test_name == 'cohen_d':
+            stat_result = test_group_mean_cohen_d(data_group_1_values, data_group_2_values)
     elif test_name == '2_sample_t_test':
             stat_result = stats.ttest_ind(data_group_1_values, data_group_2_values, equal_var = False) #equal_var = True, run 2 sample ttset, if false, run welch's test for unequal var
     elif test_name == 'permutation_test':
             stat_result =  run_permutation_test_on_diff_of_vector_means( data_group_1_values, data_group_2_values, 10000) #set to .values as original output is dict, and rounding a rdict fails 
+    
     #record the stat values (mean, sem etc)     
     if test_name == 'bootstrap_sdev_overlap':
-    
         group_mean_dict ={'group_1_mean':stat_result['group_1_mean'], 'group_1_sem':stat_result['group_1_std'],
                             'group_2_mean':stat_result['group_2_mean'], 'group_2_sem':stat_result['group_2_std']}
         stat_result = [stat_result['mean_diff_more_than_sdevs'], stat_result['pseudo_pvalue']]
+    elif test_name == 'cohen_d':
+        group_mean_dict ={'group_1_mean':stat_result['group_1_mean'], 'group_1_sem':stat_result['group_1_std'],
+                            'group_2_mean':stat_result['group_2_mean'], 'group_2_sem':stat_result['group_2_std']}
+        stat_result = [stat_result['cohen_d'], stat_result['pseudo_pvalue']]
     else:
         group_mean_dict = {'group_1_mean':np.nanmean(data_group_1_values), 'group_1_sem':scipy.stats.sem(data_group_1_values,nan_policy = 'omit' ),
                             'group_2_mean':np.nanmean(data_group_2_values), 'group_2_sem':scipy.stats.sem(data_group_2_values,nan_policy = 'omit')}
