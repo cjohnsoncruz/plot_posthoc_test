@@ -13,8 +13,10 @@ import matplotlib.transforms as mtransforms
 import numpy as np
 import seaborn as sns
 
+from .ax_inference import get_x_ticks_as_df, get_hue_point_loc_df, get_hue_errorbar_loc_dict, get_hue_point_loc_df
 ## plotting functions
-
+path_collection_type = matplotlib.collections.PathCollection
+line_type = matplotlib.lines.Line2D
 ## child based functions-
 def check_if_row_has_nan(input_array):
     return np.any(np.isnan(input_array),axis = 1)
@@ -23,8 +25,6 @@ def get_ax_children_types(ax_obj):
     ''' To- return list stating what type each child of the mplt ax object is'''
     return [type(x) for x in ax_obj.get_children()]
 
-path_collection_type = matplotlib.collections.PathCollection
-line_type = matplotlib.lines.Line2D
 
 def return_ax_child_line_coor(ax_childs, ax_child_points_index):
     ''' Given a set of indices of the ax child objects between which to query (e.g. path collections index), find fully nonnan yvals in the lines (corresponding to the actual real vertical errorbar) and return coords'''
@@ -68,6 +68,7 @@ def is_val_between_range_min_max(value, range_array):
     is_lessthan_max = value < np.max(range_array)
     is_greaterthan_min = value> np.min(range_array)
     return is_lessthan_max & is_greaterthan_min
+
 # Created more efficient version, defunct
 # def get_errorbar_span_of_hue_loc(hue_point_x_loc, hue_point_y_loc, ax_child_df, size_match = 2):
 #     '''checks 4 things: 1-2) is test_y value bewteen min/max of a line's span 3) is a row size == 2 [meaning probably line] and 4) is hue loc in a given ax child's x value'''
@@ -91,7 +92,7 @@ def get_child_df_row(hue_cat_loc,hue_num_loc, bar_coords):
     return row_match
 
 def add_errorbar_loc_on_posthoc(posthoc_df, bar_coords, overwrite_num_loc= True):
-    ''' merges posthoc df with newly created errorbar span detection '''
+    ''' merges posthoc df with newly created errorbar span detection. Overwrites g1_num_loc and g2_num_loc with max values of errorbar span'''
     error_rows = []
     success_rows = []
     for row in posthoc_df.itertuples():
@@ -112,7 +113,8 @@ def add_errorbar_loc_on_posthoc(posthoc_df, bar_coords, overwrite_num_loc= True)
 
 
 ## bottom up, but starting from close above points
-def plot_sig_bars_w_comp_df_tight(ax_input, sig_comp_df, direction_to_plot = None, tight = None, tight_offset = None, offset_constant=None, debug = None):
+def plot_sig_bars_w_comp_df_tight(
+    ax_input, sig_comp_df, direction_to_plot = None,tight = None, tight_offset = None, offset_constant=None,align = None, debug = None):
     """ 
     Plot significance bars with comparison dataframe, using a tight layout.
     TO- given parameters, plot vertical lines between centers of datapoints of interest (pre-sorted), with significance star (pre-calculated)
@@ -140,8 +142,13 @@ def plot_sig_bars_w_comp_df_tight(ax_input, sig_comp_df, direction_to_plot = Non
     #params for offsetting
     line_height = 1.00 #base case- 1.01
     if offset_constant is None:
-        offset_constant = 0.0225 #what linear amount to add, in AX FRACTION AMOUNT 
-    
+        offset_constant = 0.02 #what linear amount to add, in AX FRACTION AMOUNT 
+    if align is None:
+        horz_align = 'center' #horizontal alignment of star over line
+        vert_align = 'bottom' #vertical alignment of star over line
+        fontsize = 6 #font size of star
+        fontweight = 'normal' #font weight of star, changed from light to normal
+        
     star_space_to_line = offset_constant*0.1
     if debug == True:
         print(f'tight format, max_numeric_ax_value = {max_numeric_ax_value}.  start y val  = {line_start_y_pos}')
@@ -174,14 +181,18 @@ def plot_sig_bars_w_comp_df_tight(ax_input, sig_comp_df, direction_to_plot = Non
             text_y = y_vals[1] + star_space_to_line#what linear amount to separate star from line, in AX FRACTION AMOUNT 
             #plot sig star over line
             ax_input.plot(x_vals, y_vals, lw=annotator_default['line_width'], color = 'black', transform = trans, clip_on = False)
-            star_annot = ax_input.annotate(convert_pvalue_to_asterisks(comp.pvalue), xy = (text_x, text_y), xycoords = ('data', 'axes fraction'),
-                            ha='center', va='baseline', fontsize = 'x-small',fontweight = 'light')# bbox = {'boxstyle': 'Square, pad = 0.0', 'fc': 'lightblue', 'lw': 0})
+            star_annot = ax_input.annotate(convert_pvalue_to_asterisks(comp.pvalue), 
+            xy = (text_x, text_y), xycoords = ('data', 'axes fraction'),
+            ha=horz_align, va=vert_align, fontsize =fontsize,fontweight = fontweight,)
+            # bbox = {'boxstyle': 'Square', 'pad': 0.1, 'fc': 'lightblue', 'lw': 0})
+            #temp DEBUG-print
+            # print(star_annot)
+            # After creating annotation
+            # print("Annotation font size:", star_annot.get_fontsize())
+            # print("Annotation font properties:", star_annot.get_font_properties())
             bbox_in_ax = ax_input.transAxes.inverted().transform(star_annot.get_window_extent()) #Get the artist's bounding box in display space.
             # ax.transData.inverted() is a matplotlib.transforms.Transform that goes from display coordinates to data coordinates
             top_bbox = bbox_in_ax      #detect overlap by storing, then comparing ot previous versions
-
-
-
 
 
 ###############
@@ -189,6 +200,7 @@ def plot_sig_bars_w_comp_df_tight(ax_input, sig_comp_df, direction_to_plot = Non
 ##DEPRECATED, DEFAULT TO USING THE TIGHT VERSION
 ## main stat annotation function- no alterations possible NOW DEFUNCT
 def plot_sig_bars_w_comp_df(ax_input, sig_comp_df, direction_to_plot = None):
+    print(f"WARNING- Deprecated function, use plot_sig_bars_w_comp_df_tight instead")
     """ 
     Plot significance bars with comparison dataframe.
 
@@ -202,7 +214,7 @@ def plot_sig_bars_w_comp_df(ax_input, sig_comp_df, direction_to_plot = None):
         direction_to_plot = 'bottom_up'
 
     line_height = 1.01
-    offset_constant = 0.025 #what linear amount to add
+    offset_constant = 0.03 #what linear amount to add
     star_space_to_line = offset_constant/5
     trans = matplotlib.transforms.blended_transform_factory(x_transform = ax_input.transData,y_transform = ax_input.transAxes)# the x coords of this transformation are data, and the y coord are axes
     ## main loop over categorical ticks
@@ -218,8 +230,9 @@ def plot_sig_bars_w_comp_df(ax_input, sig_comp_df, direction_to_plot = None):
             text_y = y_vals[1] + star_space_to_line
             #plot sig star over line
             ax_input.plot(x_vals, y_vals, lw=annotator_default['line_width'], color = 'black', transform = trans, clip_on = False)
-            star_annot = ax_input.annotate(convert_pvalue_to_asterisks(comp.pvalue), xy = (text_x, text_y), xycoords = ('data', 'axes fraction'),
-                            ha='center', va='baseline', fontsize = 'small',)# bbox = {'boxstyle': 'Square, pad = 0.0', 'fc': 'lightblue', 'lw': 0})
+            star_annot = ax_input.annotate(convert_pvalue_to_asterisks(comp.pvalue),
+             xy = (text_x, text_y), xycoords = ('data', 'axes fraction'),
+                            ha='center', va='baseline', fontsize = 6,)# bbox = {'boxstyle': 'Square, pad = 0.0', 'fc': 'lightblue', 'lw': 0})
             bbox_in_ax = ax_input.transAxes.inverted().transform(star_annot.get_window_extent()) # to get ax coordinates of bounding box (transform from  Return the Bbox bounding the text, in display units.)
             top_bbox = bbox_in_ax      #detect overlap by storing, then comparing ot previous versions
 
@@ -272,7 +285,11 @@ def main_run_posthoc_tests_and_get_hue_loc_df(ax_input, plot_params, plot_obj, p
         ax_child_points_index = [count for count, x in enumerate( get_ax_children_types(plot_obj)) if x is path_collection_type]
         bar_coords =  return_ax_child_line_coor(ax_childs,ax_child_points_index)
         posthoc_df =add_errorbar_loc_on_posthoc(posthoc_df, bar_coords)
+    #now, detect max value get max of numerical ax values
+    posthoc_df['max_group_loc_val'] = posthoc_df[['g1_num_loc', 'g2_num_loc']].max(axis = 1)
+
     return posthoc_df
+
 ## ad hue vs ax order 
 def run_posthoc_tests_on_all_ax_ticks(plot_data, plot_obj, comparison_list, ax_grouping_col, group_order, hue_col_name, value_col_name,
                                       test_name = None, ax_var_is_hue = False):
@@ -443,70 +460,10 @@ def get_hue_loc_on_axis(hue_loc_df, posthoc_df, detect_error_bar = False):
     ## get location of poitns on the categorical axis (usually x but not always)
     posthoc_df['g1_cat_loc'] = posthoc_df.apply(lambda x: x['hue_group_1_locs'][x['group_1_order_pos'][0],0], axis = 1) #x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections 
     posthoc_df['g2_cat_loc'] = posthoc_df.apply(lambda x: x['hue_group_2_locs'][x['group_2_order_pos'][0],0], axis = 1) #x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections
-    #get max of numerical ax values
-    posthoc_df['max_group_loc_val'] = posthoc_df[['g1_num_loc', 'g2_num_loc']].max(axis = 1)
+    #MOVED EARLIER    #get max of numerical ax values
+    # posthoc_df['max_group_loc_val'] = posthoc_df[['g1_num_loc', 'g2_num_loc']].max(axis = 1)
     return posthoc_df 
 
-
-##HELPER FUNCTIONS
-##get information about hue locs 
-def get_hue_point_loc_df(ax_input, hue_order):
-    """ 
-    Get a DataFrame of the datapoints at each level of the hue variable.
-
-    Parameters:
-    ax_input (matplotlib.axes.Axes): The input axis object.
-    hue_order (list): The order of the hue.
-
-    Returns:
-    pandas.DataFrame: DataFrame with hue point locations.
-    """
-    hue_loc_df = pd.DataFrame.from_dict(get_hue_point_loc_dict(ax_input, hue_order)).set_index('hue') #get array of numerical points and values for each hue level
-    return hue_loc_df
-
-def get_hue_errorbar_loc_dict(ax_input, hue_order):
-    """ 
-    Get a dictionary of the data errorbars at each level of the hue variable.
-
-    Parameters:
-    ax_input (matplotlib.axes.Axes): The input axis object.
-    hue_order (list): The order of the hue in a list.
-
-    Returns:
-    dict: Dictionary with hue errorbar  locations.
-    """
-    hue_point_loc_dict = [{'hue': hue_order[count],
-                            'data_locs':x.get_offsets().data} for count, x in enumerate(ax_input.collections)]
-    return hue_point_loc_dict
-
-    
-def get_hue_point_loc_dict(ax_input, hue_order):
-    """ 
-    Get a dictionary of the datapoints at each level of the hue variable.
-
-    Parameters:
-    ax_input (matplotlib.axes.Axes): The input axis object.
-    hue_order (list): The order of the hue.
-
-    Returns:
-    dict: Dictionary with hue point locations.
-    """
-    hue_point_loc_dict = [{'hue': hue_order[count], 'data_locs':x.get_offsets().data} for count, x in enumerate(ax_input.collections)]
-    return hue_point_loc_dict
-
-def get_x_ticks_as_df(ticklabel_obj):
-    """ 
-    Get a DataFrame of the x-tick labels and their positions.
-
-    Parameters:
-    ticklabel_obj (list): List of tick label objects.
-
-    Returns:
-    pandas.DataFrame: DataFrame with x-tick labels and positions.
-    """
-    ticks_df = pd.DataFrame.from_records([{'tick_text':x.get_text(), 'tick_pos': x.get_position()} for x in ticklabel_obj])
-    return ticks_df
- 
 
 def get_sig_bar_x_vals(comparison_tuple):
     """ 
@@ -538,3 +495,4 @@ def get_sig_bar_y_vals(bottom_val = None, line_height= 1.01):
     # bottom_val = comparison_tuple.max_group_loc_val * offset_factor #for data point plotting
     y_vals = [bottom_val,bottom_val* line_height, bottom_val*line_height,bottom_val]# list the 4 x coord for points that define the line
     return y_vals
+
