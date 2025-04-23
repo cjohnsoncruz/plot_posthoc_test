@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import matplotlib.transforms as mtransforms
 import numpy as np
 import seaborn as sns
+import logging 
 
 from .ax_inference import get_x_ticks_as_df, get_hue_point_loc_df, get_hue_errorbar_loc_dict, get_hue_point_loc_df
 ## plotting functions
@@ -47,13 +48,7 @@ def return_ax_child_line_coor(ax_childs, ax_child_points_index):
         child = pd.DataFrame.from_records(cis)
         ci_info.append(child)
     # ci_x = [x.get_xdata() for x in child_range] # ci_y = [x.get_ydata() for x in child_range] #old way of getting x values
-    #NEW LOGIC- drop nan rows (as those arne't real lines)
-    coords = pd.concat(ci_info).reset_index()
-    coords['y_is_nonnan'] = coords.child_y.apply(lambda x: np.logical_not(np.any(np.isnan(x))))
-    coords['y_is_2_elem'] = coords.child_y.apply(lambda x:x.size == 2)
-    drop_nan_row= True
-    if drop_nan_row:
-        coords= coords[coords['y_is_nonnan']]
+    coords = pd.concat(ci_info).reset_index()    
     return coords
 
 # def return_point_in_one_sample():#THIS ONLY WORKS WITH 1 VALUEs
@@ -88,7 +83,7 @@ def get_child_df_row(hue_cat_loc,hue_num_loc, bar_coords):
     is_hue_point_in_range_bounds = bar_coords.apply(lambda x: is_val_between_range_min_max(hue_num_loc,x.child_y),axis = 1)
     #these need to iterate over entire DF to get complete bool made
     bar_row_bool = is_hue_point_in_range_bounds & bar_coords.y_is_2_elem & is_in_child_x_vals
-    row_match = bar_coords[bar_row_bool].drop(['index','next_collection_index', 'child_index'],axis = 1)
+    row_match = bar_coords[bar_row_bool].drop([x for x in ['index','next_collection_index', 'child_index'] if x in bar_coords.columns],axis = 1)
     return row_match
 
 def add_errorbar_loc_on_posthoc(posthoc_df, bar_coords, overwrite_num_loc= True):
@@ -218,7 +213,8 @@ def plot_sig_bars_w_comp_df_tight(ax_input, sig_comp_df, direction_to_plot = Non
 ## test running functinos
 #common error- ValueError: Cannot set a DataFrame with multiple columns to the single column g1_num_loc- this is if you mistype the hue value or you use the wrong version of SNS 
 def main_run_posthoc_tests_and_get_hue_loc_df(ax_input, plot_params, plot_obj, preset_comparisons,
-                                               hue_var= None, test_name = None, hue_order = None, ax_var_is_hue=False,detect_error_bar = False):
+                                               hue_var= None, test_name = None, hue_order = None, ax_var_is_hue=False,detect_error_bar = False,
+                                               plot_type = None):
     """ 
     Run posthoc tests on all axis ticks, get hue levels for each axis tick, and join this to the dataframe produced.
 
@@ -235,6 +231,9 @@ def main_run_posthoc_tests_and_get_hue_loc_df(ax_input, plot_params, plot_obj, p
     Returns:
     pandas.DataFrame: DataFrame with posthoc test results and hue locations.
     """
+    
+    if plot_type is None: #default to pointplot
+        plot_type = 'pointplot'
     if hue_var is None:
         hue_var = plot_params['hue']
     if hue_order is None:
@@ -250,23 +249,55 @@ def main_run_posthoc_tests_and_get_hue_loc_df(ax_input, plot_params, plot_obj, p
                                                    comparison_list =preset_comparisons, ax_grouping_col= plot_params['x'],
                                                    group_order = group_order, hue_col_name=hue_var, value_col_name = plot_params['y'],
                                                    test_name = test_name,ax_var_is_hue=ax_var_is_hue)## get df with info on post-hoc comparisons
-    hue_loc_df = get_hue_point_loc_df(ax_input, hue_order) # hue_loc_df = pd.DataFrame.from_dict(get_hue_point_loc_dict(plot_ax, geno_order)).set_index('hue') #get array of numerical points and values for each hue level
-    posthoc_df = get_hue_loc_on_axis(hue_loc_df, posthoc_df) #find pos in numerical ax of fig, then add as cols to df
-    #manually set cat compared within to single variable if hue == axis category
+    
+    #locate hue points based on what plot you are working with     #e.g. pointplot uses collections, barplot doesn't 
+    if plot_type == 'pointplot':
+        hue_loc_df = get_hue_point_loc_df(ax_input, hue_order) # hue_loc_df = pd.DataFrame.from_dict(get_hue_point_loc_dict(plot_ax, geno_order)).set_index('hue') #get array of numerical points and values for each hue level
+        posthoc_df = get_hue_loc_on_axis(hue_loc_df, posthoc_df) #find pos in numerical ax of fig, then add as cols to df
+        #manually set cat compared within to single variable if hue == axis category
+    if plot_type == 'barplot': #given barplot doesn't use colelctions, write custom script s to detect positions
+        #get hue location via barplot  #barplot- non errorbar handling
+        rects = [x for x in ax_input.get_children() if (isinstance(x, matplotlib.patches.Rectangle) and not np.isnan(x.get_height()))] #get non nan rects, which are REAL data 
+        #barplot equivalent- manually gets x center and height (as starts at 0, equals to y pos), transforming to rectangle
+        rect_count_loc = [(count, 
+                           np.array([[x.get_center()[0], x.get_height()],
+                                     [x.get_center()[0], x.get_height()]]) #repeat (x at center, y height) to allow for the errorbar dependent code to pick it up 
+                          ) for count,x in enumerate(rects)if ((x is not ax_input.patch) and not np.isnan(x.get_height()))] #need to set list o list as np array for rpoper indexing
+        
+        hue_point_loc_dict = [{'hue': hue_order[count], 'data_locs': locs} for count,locs in rect_count_loc]
+        hue_loc_df = pd.DataFrame(hue_point_loc_dict).set_index('hue')
+        posthoc_df = get_hue_loc_on_axis(hue_loc_df, posthoc_df,plot_type =plot_type) #find pos in numerical ax of fig, then add as cols to df
+    #store in posthoc_df
     if ax_var_is_hue: #you will use this to find the ordering of the hue collection points of interest
         posthoc_df['category_compared_within']= plot_params['x']
     
-    if detect_error_bar: #NEW_ add errorbar locs to posthoc df
-        print('Error bar detected, moving bounds')
-        ax_childs =plot_obj.get_children()
-        ax_child_points_index = [count for count, x in enumerate( get_ax_children_types(plot_obj)) if x is path_collection_type]
-        bar_coords =  return_ax_child_line_coor(ax_childs,ax_child_points_index)
+    if detect_error_bar: #NEW_ add errorbar locs to posthoc df        # logging.info('Error bar detected, moving bounds')
+        if plot_type == 'pointplot': #pointplot logic
+            ax_childs =plot_obj.get_children()
+            ax_child_points_index = [count for count, x in enumerate( get_ax_children_types(plot_obj)) if x is path_collection_type]
+            #merge errbarbar info with existing posthoc df 
+            bar_coords =  return_ax_child_line_coor(ax_childs,ax_child_points_index)
+        if plot_type == 'barplot':            #func- get bar coordinates
+            #barplot- errorbar detection #adapting errorbar line inheritance 
+            lines = [x for x in ax_input.get_children() if isinstance(x, matplotlib.lines.Line2D)]
+            cis = [{'child_index': count,
+                    'child_x':np.round(x.get_xdata(),decimals = 2),
+                    'child_y':x.get_ydata(), } for count, x in enumerate(lines) if not np.isnan(x.get_ydata()).any()] #each child N gets a dict N with information
+            bar_coords = pd.DataFrame.from_records(cis).reset_index()
+            
+        bar_coords['y_is_nonnan'] = bar_coords.child_y.apply(lambda x: np.logical_not(np.any(np.isnan(x))))
+        bar_coords['y_is_2_elem'] =bar_coords.child_y.apply(lambda x:x.size == 2)
+        ## merge bar corods 
         posthoc_df =add_errorbar_loc_on_posthoc(posthoc_df, bar_coords)
-    #now, detect max value get max of numerical ax values
-    posthoc_df['max_group_loc_val'] = posthoc_df[['g1_num_loc', 'g2_num_loc']].max(axis = 1)
-    posthoc_df.loc[:, ['group_1_mean','group_1_sem','group_2_mean','group_2_sem']] = posthoc_df.loc[:, ['group_1_mean','group_1_sem','group_2_mean','group_2_sem']].round(4)
+        posthoc_df['max_group_loc_val'] = posthoc_df[['g1_num_loc', 'g2_num_loc']].max(axis = 1)    #now, detect max value get max of numerical ax values
+        #if using barplot- drop nan rows (as those arne't real lines)
+        drop_nan_row= True
+        if drop_nan_row:
+            bar_coords=bar_coords[bar_coords['y_is_nonnan']]
 
+    posthoc_df.loc[:, ['group_1_mean','group_1_sem','group_2_mean','group_2_sem']] = posthoc_df.loc[:, ['group_1_mean','group_1_sem','group_2_mean','group_2_sem']].round(4)
     return posthoc_df
+
 
 ## ad hue vs ax order 
 def run_posthoc_tests_on_all_ax_ticks(plot_data, plot_obj, 
@@ -418,7 +449,7 @@ def get_pair_stat_test_result(
     return result_dict
     ## build custom plotting ufnction
 
-def get_hue_loc_on_axis(hue_loc_df, posthoc_df, detect_error_bar = False): 
+def get_hue_loc_on_axis(hue_loc_df, posthoc_df, detect_error_bar = False,plot_type ='pointplot'): 
     """ 
     Add numerical and categorical axis locations to the posthoc comparison dataframe. Main function creating/label numeric loc on axis 
     NEW (2.6.25)- add detect errorbar  to automatically detect errorbar, and move point marked for symbol loc if so 
@@ -426,24 +457,31 @@ def get_hue_loc_on_axis(hue_loc_df, posthoc_df, detect_error_bar = False):
     hue_loc_df (pandas.DataFrame): DataFrame with hue locations.
     posthoc_df (pandas.DataFrame): DataFrame with posthoc comparisons.
 
-    Returns:
-    pandas.DataFrame: Updated DataFrame with axis locations.
-    """
-    """ given hue_loc_df listing where each point for the given hue categories are located, use the pre-existing post hoc comparison df
+    given hue_loc_df listing where each point for the given hue categories are located, use the pre-existing post hoc comparison df
     and add a new column to dataframe indicating y/numerical ax loc for each comparison 
     g1/2_num_loc: the value of position of group 1/2 (usually on the y axis) on the numerical axis used
     g1/2_cat_loc: the value of point of group 1/2 (usually on the x axis) on the categorical axis used
-    group_1/2_order_pos is used to to know what the values are """
+    group_1/2_order_pos is used to to know what the values are 
+    Returns:    pandas.DataFrame: Updated DataFrame with axis locations.    
+    """
         ## get loc of points on the numerical ax (usually y but not always)
         #index into hueloc df, with index = hue Group_1 name of posthoc df ; then, get list of point vals in collection; then, 
     posthoc_df['hue_group_1_locs'] = posthoc_df.apply(lambda x: hue_loc_df.loc[x['group_1']], axis = 1) #elem index = what x tick num elem is centered on
     posthoc_df['hue_group_2_locs'] = posthoc_df.apply(lambda x: hue_loc_df.loc[x['group_2']], axis = 1) #elem index = what x tick num elem is centered on
-    posthoc_df['g1_num_loc'] = posthoc_df.apply(lambda x: x['hue_group_1_locs'][x['group_1_order_pos'][0],1], axis = 1) #x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections 
-    posthoc_df['g2_num_loc'] = posthoc_df.apply(lambda x: x['hue_group_2_locs'][x['group_2_order_pos'][0],1], axis = 1) #x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections 
+    
+    if plot_type == 'pointplot': #if you are using the default pointplot, need to locate xydata in multi element list
+        posthoc_df['g1_num_loc'] = posthoc_df.apply(lambda x: x['hue_group_1_locs'][x['group_1_order_pos'][0],1], axis = 1) #x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections 
+        posthoc_df['g2_num_loc'] = posthoc_df.apply(lambda x: x['hue_group_2_locs'][x['group_2_order_pos'][0],1], axis = 1) #x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections 
+        ## get location of poitns on the categorical axis (usually x but not always)
+        posthoc_df['g1_cat_loc'] = posthoc_df.apply(lambda x: x['hue_group_1_locs'][x['group_1_order_pos'][0],0], axis = 1) #x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections 
+        posthoc_df['g2_cat_loc'] = posthoc_df.apply(lambda x: x['hue_group_2_locs'][x['group_2_order_pos'][0],0], axis = 1) #x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections
 
-    ## get location of poitns on the categorical axis (usually x but not always)
-    posthoc_df['g1_cat_loc'] = posthoc_df.apply(lambda x: x['hue_group_1_locs'][x['group_1_order_pos'][0],0], axis = 1) #x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections 
-    posthoc_df['g2_cat_loc'] = posthoc_df.apply(lambda x: x['hue_group_2_locs'][x['group_2_order_pos'][0],0], axis = 1) #x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections
+    if plot_type == 'barplot': #if you are using the default pointplot, need to locate xydata in multi element list
+        posthoc_df['g1_num_loc'] = posthoc_df.apply(lambda x: x['hue_group_1_locs'][0,1], axis = 1) #x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections 
+        posthoc_df['g2_num_loc'] = posthoc_df.apply(lambda x: x['hue_group_2_locs'][0,1], axis = 1) #x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections 
+        ## get location of poitns on the categorical axis (usually x but not always)
+        posthoc_df['g1_cat_loc'] = posthoc_df.apply(lambda x: x['hue_group_1_locs'][0,0], axis = 1) #x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections 
+        posthoc_df['g2_cat_loc'] = posthoc_df.apply(lambda x: x['hue_group_2_locs'][0,0], axis = 1) #x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections
     #MOVED EARLIER    #get max of numerical ax values
     # posthoc_df['max_group_loc_val'] = posthoc_df[['g1_num_loc', 'g2_num_loc']].max(axis = 1)
     return posthoc_df 
