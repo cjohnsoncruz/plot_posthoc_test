@@ -47,7 +47,7 @@ def get_hue_point_loc_dict(ax_input, hue_order):
     Returns:
     dict: Dictionary with hue point locations.
     """
-    hue_point_loc_dict = [{'hue': hue_order[count], 'data_locs':x.get_offsets().data} for count, x in enumerate(ax_input.collections)]
+    hue_point_loc_dict = [{'hue': hue_order[count], 'data_locs':x.get_offsets().data} for count, x in enumerate(ax_input.collections) if x.get_offsets().data.size > 0]
     return hue_point_loc_dict
 
 def get_x_ticks_as_df(ticklabel_obj):

@@ -108,9 +108,10 @@ def add_errorbar_loc_on_posthoc(posthoc_df, bar_coords, overwrite_num_loc= True)
         posthoc_df.loc[:, 'g2_num_loc'] = posthoc_df.apply(lambda x: x['g_2_child_y'].max(),axis = 1)
     return posthoc_df
 
-
 ## bottom up, but starting from close above points
-def plot_sig_bars_w_comp_df_tight(ax_input, sig_comp_df, direction_to_plot = None,tight = None, tight_offset = None, offset_constant=None,align = None, debug = None):
+def plot_sig_bars_w_comp_df_tight(
+    ax_input, sig_comp_df, direction_to_plot = None,tight = None,
+     tight_offset = None, offset_constant=None,align = None, debug = None):
     """ 
     Plot significance bars with comparison dataframe, using a tight layout.
     TO- given parameters, plot vertical lines between centers of datapoints of interest (pre-sorted), with significance star (pre-calculated)
@@ -124,7 +125,6 @@ def plot_sig_bars_w_comp_df_tight(ax_input, sig_comp_df, direction_to_plot = Non
     debug (bool, optional): Whether to print debug information. Defaults to None.
     """
     ## plotting params    #set direction to plot ('top_down', 'bottom_up') #set whether bars are plotted right above their coresponding values, or not
-    
     #default vcalues
     if direction_to_plot is None:
         direction_to_plot = 'bottom_up'
@@ -141,11 +141,11 @@ def plot_sig_bars_w_comp_df_tight(ax_input, sig_comp_df, direction_to_plot = Non
         offset_constant = 0.02 #what linear amount to add, in AX FRACTION AMOUNT 
     if align is None:
         horz_align = 'center' #horizontal alignment of star over line
-        vert_align = 'baseline' #vertical alignment of star over line
-        fontsize = 6 #font size of star
+        vert_align = 'center_baseline' #vertical alignment of star over line
+        fontsize = 8 #font size of star
         fontweight = 'normal' #font weight of star, changed from light to normal
     #originall in ax fraction, I want in pixels?
-    star_space_to_line = offset_constant*0.02
+    star_space_to_line = offset_constant*1
     
     #declare initial transforms of interest
     transform_ax_to_data = ax_input.transAxes + ax_input.transData.inverted() #create ax-display + display-data pipe
@@ -179,35 +179,121 @@ def plot_sig_bars_w_comp_df_tight(ax_input, sig_comp_df, direction_to_plot = Non
             ##max of numerical ax values is taken during INITIAL localization of points, not post errorbar detection
             y_vals =get_sig_bar_y_vals(bottom_val = line_start_y_pos,line_height = line_height) #  [comp.max_group_loc_val, comp.max_group_loc_val * h, comp.max_group_loc_val * h, comp.max_group_loc_val] # list 4 y coord for points that define the line
             #compare overlap of proposed y values, in data space 
-            line_overlap = (y_vals[0] <= category_highest_y )##check y overlap with previous bounding box,       #top right point y val in top_box defined by [1,1]
-            if line_overlap: #if the top of the prev bbox overlaps with the current line, move the current line up to ABOVE top bbox
-                y_vals = get_sig_bar_y_vals(category_highest_y+offset_constant,line_height)             ## if overlaps with previous bounding box, adjust height by N
             
             if debug == True:
                 print(f"Comp: {comp_count} line overlap = ({y_vals[0]} <= {category_highest_y}). line x_vals, y_vals: {x_vals, y_vals}")
             
+            line_overlap = (y_vals[0] <= category_highest_y )##check y overlap with previous bounding box,       #top right point y val in top_box defined by [1,1]
+            if line_overlap: #if the top of the prev bbox overlaps with the current line, move the current line up to ABOVE top bbox
+                
+                y_vals = get_sig_bar_y_vals(category_highest_y+ offset_constant,line_height)             ## if overlaps with previous bounding box, adjust height by N
+            
             #set position for star/sig. annotation
             text_x = (x_vals[0]+ x_vals[2])*.5
+            #do you need to have additional space to line 
             text_y = y_vals[1] + star_space_to_line #what linear amount to separate star from line, in AX FRACTION AMOUNT 
             #plot annot line over pair 
-            ax_input.plot(x_vals, y_vals, lw=annotator_default['line_width'], color = 'black',
-                          transform = trans, clip_on = False)
+            ax_input.plot(x_vals, y_vals, lw=annotator_default['line_width'], color = 'black',transform = trans, clip_on = False)
             #plot sig star over line
             star_str = convert_pvalue_to_asterisks(comp.pvalue)
             star_annot = ax_input.annotate(star_str, ha=horz_align, va=vert_align, fontsize =fontsize,fontweight = fontweight,
                                            xy = (text_x, text_y), xycoords = ('data', 'axes fraction'), 
-                                           bbox = {'boxstyle': 'Square', 'pad': 0.1, 'fc': 'None', 'lw': 0})
+                                           bbox = {'boxstyle': 'Square', 'pad': 0.05, 'fc': 'None', 'lw': 0})
              #CRITICAL STEP- UPDATE CANVAS BEFORE DRAWING TO ENSURE OVERLAP NOT AFFECTED
             ax_input.figure.canvas.draw()
             bbox_in_ax = ax_input.transAxes.inverted().transform(star_annot.get_window_extent()) #Get the artist's bounding box in display space.
             # ax.transData.inverted() is a matplotlib.transforms.Transform that goes from display coordinates to data coordinates
             top_bbox = bbox_in_ax      #detect overlap by storing, then comparing ot previous versions
-            category_highest_y = top_bbox[1,1]
+            category_highest_y = max(category_highest_y, bbox_in_ax[1, 1] + 1*offset_constant) #star_space_to_line)
+
             if debug:
                 print(f'text-y = {y_vals[1]} + {star_space_to_line}')
                 print(f" annot bbox window extent {type(star_annot.get_window_extent())} ({star_annot.get_window_extent()}")
                 print(f" annot bbox in transform ({star_annot.xycoords}) : ({star_annot.xy})")
                 print(f"bbox transformed: {bbox_in_ax} \n")
+    # #default vcalues
+    # if direction_to_plot is None:
+    #     direction_to_plot = 'bottom_up'
+    #     line_start_y_pos = 0.8 #base case- plot upwards from 0.8 of ax size 
+        
+    # if tight is None:
+    #     tight = True #set whether or not to plot bars RIGHT above datapoints
+        
+    # if tight_offset is None:
+    #     tight_offset = 0.04 #fraction of ax to put between the point of interest and the line of sig post-hoc
+    # #params for offsetting
+    # line_height = 1.00 #base case- 1.01
+    # if offset_constant is None:
+    #     offset_constant = 0.02 #what linear amount to add, in AX FRACTION AMOUNT 
+    # if align is None:
+    #     horz_align = 'center' #horizontal alignment of star over line
+    #     vert_align = 'baseline' #vertical alignment of star over line
+    #     fontsize = 8 #font size of star
+    #     fontweight = 'bold' #font weight of star, changed from light to normal
+    # #originall in ax fraction, I want in pixels?
+    # star_space_to_line = offset_constant*0.025
+    
+    # #declare initial transforms of interest
+    # transform_ax_to_data = ax_input.transAxes + ax_input.transData.inverted() #create ax-display + display-data pipe
+    # transform_data_to_ax = transform_ax_to_data.inverted() # 
+    #     #transData transforms: (DATA) -> (DISPLAY COORDINATES)     # transAxes transforms (AXES) -> (DISPLAY)     #all transforms -> display coords 
+    # trans = matplotlib.transforms.blended_transform_factory(x_transform = ax_input.transData,
+    #                                                         y_transform = ax_input.transAxes)# the x coords of this transformation are data, and the y coord are axes
+    
+    # ##set default bbox
+    # category_base_y_box = np.array([[0, 0],[0, 0]])#initialize box location for comparison # =[lower_x, lower_y] [upper_x, upper_y]
+    # ## main loop over categorical ticks, bottom up approach 
+
+    # for cat in sig_comp_df['category_compared_within'].unique():#iterate over each categorical tick value
+    #     sig_comp_category = sig_comp_df.loc[sig_comp_df.category_compared_within == cat,:]
+
+    #     #get max y position value for each category you're doing post-hoc comparisons within
+    #     top_bbox = category_base_y_box #for first iter, set blank
+    #     category_highest_y = top_bbox[1,1]
+        
+    #     if tight:
+    #         #transform max group location from DATA to AXIS
+    #         max_numeric_ax_value = sig_comp_category.loc[:, ['g1_num_loc','g2_num_loc']].max().values.max()    #get max val in the group of interest you're running posthocs on (x ticks of interest)    
+    #         line_start_y_pos = transform_data_to_ax.transform((0,max_numeric_ax_value))[1]+tight_offset # data -> axes 
+            
+    #         if debug == True:
+    #             print(f'tight format, max_numeric_ax_value = {max_numeric_ax_value}.  start y val  = {line_start_y_pos}')
+    #         #transData transforms: (DATA) -> (DISPLAY COORDINATES)     # transAxes transforms (AXES) -> (DISPLAY)     
+    #     for comp_count, comp in enumerate(sig_comp_category.itertuples()):
+            
+    #         x_vals = get_sig_bar_x_vals(comp) # [comp.g1_cat_loc, comp.g1_cat_loc, comp.g2_cat_loc, comp.g2_cat_loc]# list the 4 x coord for points that define the line
+    #         ##max of numerical ax values is taken during INITIAL localization of points, not post errorbar detection
+    #         y_vals =get_sig_bar_y_vals(bottom_val = line_start_y_pos,line_height = line_height) #  [comp.max_group_loc_val, comp.max_group_loc_val * h, comp.max_group_loc_val * h, comp.max_group_loc_val] # list 4 y coord for points that define the line
+    #         #compare overlap of proposed y values, in data space 
+    #         line_overlap = (y_vals[0] <= category_highest_y )##check y overlap with previous bounding box,       #top right point y val in top_box defined by [1,1]
+    #         if line_overlap: #if the top of the prev bbox overlaps with the current line, move the current line up to ABOVE top bbox
+    #             y_vals = get_sig_bar_y_vals(category_highest_y+offset_constant,line_height)             ## if overlaps with previous bounding box, adjust height by N
+            
+    #         if debug == True:
+    #             print(f"Comp: {comp_count} line overlap = ({y_vals[0]} <= {category_highest_y}). line x_vals, y_vals: {x_vals, y_vals}")
+            
+    #         #set position for star/sig. annotation
+    #         text_x = (x_vals[0]+ x_vals[2])*.5
+    #         text_y = y_vals[1] + star_space_to_line #what linear amount to separate star from line, in AX FRACTION AMOUNT 
+    #         #plot annot line over pair 
+    #         ax_input.plot(x_vals, y_vals, lw=annotator_default['line_width'], color = 'black',transform = trans, clip_on = False)
+    #         #plot sig star over line
+    #         star_str = convert_pvalue_to_asterisks(comp.pvalue)
+    #         star_annot = ax_input.annotate(star_str, ha=horz_align, va=vert_align, fontsize =fontsize,fontweight = fontweight,
+    #                                        xy = (text_x, text_y), xycoords = ('data', 'axes fraction'), 
+    #                                        bbox = {'boxstyle': 'Square', 'pad': 0.05, 'fc': 'None', 'lw': 0})
+    #          #CRITICAL STEP- UPDATE CANVAS BEFORE DRAWING TO ENSURE OVERLAP NOT AFFECTED
+    #         ax_input.figure.canvas.draw()
+    #         bbox_in_ax = ax_input.transAxes.inverted().transform(star_annot.get_window_extent()) #Get the artist's bounding box in display space.
+    #         # ax.transData.inverted() is a matplotlib.transforms.Transform that goes from display coordinates to data coordinates
+    #         top_bbox = bbox_in_ax      #detect overlap by storing, then comparing ot previous versions
+    #         category_highest_y = max(category_highest_y, bbox_in_ax[1, 1] + star_space_to_line)
+
+    #         if debug:
+    #             print(f'text-y = {y_vals[1]} + {star_space_to_line}')
+    #             print(f" annot bbox window extent {type(star_annot.get_window_extent())} ({star_annot.get_window_extent()}")
+    #             print(f" annot bbox in transform ({star_annot.xycoords}) : ({star_annot.xy})")
+    #             print(f"bbox transformed: {bbox_in_ax} \n")
             
 
 ## test running functinos
@@ -231,9 +317,10 @@ def main_run_posthoc_tests_and_get_hue_loc_df(ax_input, plot_params, plot_obj, p
     Returns:
     pandas.DataFrame: DataFrame with posthoc test results and hue locations.
     """
-    
+    external_plot_type = plot_type 
     if plot_type is None: #default to pointplot
         plot_type = 'pointplot'
+    
     if hue_var is None:
         hue_var = plot_params['hue']
     if hue_order is None:
@@ -251,9 +338,8 @@ def main_run_posthoc_tests_and_get_hue_loc_df(ax_input, plot_params, plot_obj, p
                                                    test_name = test_name,ax_var_is_hue=ax_var_is_hue)## get df with info on post-hoc comparisons
     
     #locate hue points based on what plot you are working with     #e.g. pointplot uses collections, barplot doesn't 
-    if plot_type == 'pointplot':
+    if plot_type in ['pointplot', 'stripplot']: #stripplot is a pointplot with jitter, so same logic applies
         hue_loc_df = get_hue_point_loc_df(ax_input, hue_order) # hue_loc_df = pd.DataFrame.from_dict(get_hue_point_loc_dict(plot_ax, geno_order)).set_index('hue') #get array of numerical points and values for each hue level
-        posthoc_df = get_hue_loc_on_axis(hue_loc_df, posthoc_df) #find pos in numerical ax of fig, then add as cols to df
         #manually set cat compared within to single variable if hue == axis category
     if plot_type == 'barplot': #given barplot doesn't use colelctions, write custom script s to detect positions
         #get hue location via barplot  #barplot- non errorbar handling
@@ -266,13 +352,13 @@ def main_run_posthoc_tests_and_get_hue_loc_df(ax_input, plot_params, plot_obj, p
         
         hue_point_loc_dict = [{'hue': hue_order[count], 'data_locs': locs} for count,locs in rect_count_loc]
         hue_loc_df = pd.DataFrame(hue_point_loc_dict).set_index('hue')
-        posthoc_df = get_hue_loc_on_axis(hue_loc_df, posthoc_df,plot_type =plot_type) #find pos in numerical ax of fig, then add as cols to df
+    posthoc_df = get_hue_loc_on_axis(hue_loc_df, posthoc_df,plot_type =plot_type) #find pos in numerical ax of fig, then add as cols to df
     #store in posthoc_df
     if ax_var_is_hue: #you will use this to find the ordering of the hue collection points of interest
         posthoc_df['category_compared_within']= plot_params['x']
     
     if detect_error_bar: #NEW_ add errorbar locs to posthoc df        # logging.info('Error bar detected, moving bounds')
-        if plot_type == 'pointplot': #pointplot logic
+        if plot_type in ['pointplot']: #stripplot is a pointplot with jitter, so same logic applies
             ax_childs =plot_obj.get_children()
             ax_child_points_index = [count for count, x in enumerate( get_ax_children_types(plot_obj)) if x is path_collection_type]
             #merge errbarbar info with existing posthoc df 
@@ -289,12 +375,13 @@ def main_run_posthoc_tests_and_get_hue_loc_df(ax_input, plot_params, plot_obj, p
         bar_coords['y_is_2_elem'] =bar_coords.child_y.apply(lambda x:x.size == 2)
         ## merge bar corods 
         posthoc_df =add_errorbar_loc_on_posthoc(posthoc_df, bar_coords)
-        posthoc_df['max_group_loc_val'] = posthoc_df[['g1_num_loc', 'g2_num_loc']].max(axis = 1)    #now, detect max value get max of numerical ax values
         #if using barplot- drop nan rows (as those arne't real lines)
         drop_nan_row= True
         if drop_nan_row:
             bar_coords=bar_coords[bar_coords['y_is_nonnan']]
-
+    
+    #final posthoc df editing 
+    posthoc_df['max_group_loc_val'] = posthoc_df[['g1_num_loc', 'g2_num_loc']].max(axis = 1)    #now, detect max value get max of numerical ax values
     posthoc_df.loc[:, ['group_1_mean','group_1_sem','group_2_mean','group_2_sem']] = posthoc_df.loc[:, ['group_1_mean','group_1_sem','group_2_mean','group_2_sem']].round(4)
     return posthoc_df
 
@@ -379,7 +466,6 @@ def run_posthoc_test_on_tick_hue_groups(ax_tick_data, hue_group_1, hue_group_2, 
     ## run stats on group values
     result_dict = get_pair_stat_test_result(test_name, ax_category_level,group_order, hue_group_1, hue_group_2, data_group_1_values,data_group_2_values,ax_var_is_hue)
     return result_dict
-    
     
     ## custom function to do stats on grups of interest
 def get_pair_stat_test_result(
@@ -468,13 +554,23 @@ def get_hue_loc_on_axis(hue_loc_df, posthoc_df, detect_error_bar = False,plot_ty
         #index into hueloc df, with index = hue Group_1 name of posthoc df ; then, get list of point vals in collection; then, 
     posthoc_df['hue_group_1_locs'] = posthoc_df.apply(lambda x: hue_loc_df.loc[x['group_1']], axis = 1) #elem index = what x tick num elem is centered on
     posthoc_df['hue_group_2_locs'] = posthoc_df.apply(lambda x: hue_loc_df.loc[x['group_2']], axis = 1) #elem index = what x tick num elem is centered on
-    
+
+#NEW_ strip/swarm plot- get the y loc of the points in the collection, and add to posthoc df
+    if plot_type == 'stripplot': #if you are using the default pointplot, need to locate xydata in multi element list
+        #strip plot data saves an array of points, so need to get the max value of the y locs in the collection and mean of x locs
+        posthoc_df['g1_num_loc'] = posthoc_df.apply(lambda x: np.max(x['hue_group_1_locs'][:,1]), axis = 1) #x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections 
+        posthoc_df['g2_num_loc'] = posthoc_df.apply(lambda x: np.max(x['hue_group_2_locs'][:,1]), axis = 1) #x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections 
+        ## get location of poitns on the categorical axis (usually x but not always)
+        posthoc_df['g1_cat_loc'] = posthoc_df.apply(lambda x: np.mean(x['hue_group_1_locs'][:,0]), axis = 1) #x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections 
+        posthoc_df['g2_cat_loc'] = posthoc_df.apply(lambda x: np.mean(x['hue_group_2_locs'][:,0]), axis = 1)#x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections
+
     if plot_type == 'pointplot': #if you are using the default pointplot, need to locate xydata in multi element list
         posthoc_df['g1_num_loc'] = posthoc_df.apply(lambda x: x['hue_group_1_locs'][x['group_1_order_pos'][0],1], axis = 1) #x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections 
         posthoc_df['g2_num_loc'] = posthoc_df.apply(lambda x: x['hue_group_2_locs'][x['group_2_order_pos'][0],1], axis = 1) #x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections 
         ## get location of poitns on the categorical axis (usually x but not always)
         posthoc_df['g1_cat_loc'] = posthoc_df.apply(lambda x: x['hue_group_1_locs'][x['group_1_order_pos'][0],0], axis = 1) #x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections 
         posthoc_df['g2_cat_loc'] = posthoc_df.apply(lambda x: x['hue_group_2_locs'][x['group_2_order_pos'][0],0], axis = 1) #x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections
+
 
     if plot_type == 'barplot': #if you are using the default pointplot, need to locate xydata in multi element list
         posthoc_df['g1_num_loc'] = posthoc_df.apply(lambda x: x['hue_group_1_locs'][0,1], axis = 1) #x['group_1_order_pos'][0] = position of group 1 being used, in ordered list of collections 
