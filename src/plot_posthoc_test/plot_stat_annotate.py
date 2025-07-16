@@ -14,7 +14,14 @@ import numpy as np
 import seaborn as sns
 import logging 
 
-from .ax_inference import get_x_ticks_as_df, get_hue_point_loc_df, get_hue_errorbar_loc_dict, get_hue_point_loc_df
+# Import ax_inference functions without circular import
+# Define imports that will be used when module is part of a package
+try:
+    from plot_posthoc_test.ax_inference import get_x_ticks_as_df, get_hue_point_loc_df, get_hue_errorbar_loc_dict
+# Fall back to direct import when run as a script
+except ImportError:
+    from ax_inference import get_x_ticks_as_df, get_hue_point_loc_df, get_hue_errorbar_loc_dict
+
 ## plotting functions
 path_collection_type = matplotlib.collections.PathCollection
 line_type = matplotlib.lines.Line2D
@@ -153,41 +160,31 @@ def plot_sig_bars_w_comp_df_tight(
         #transData transforms: (DATA) -> (DISPLAY COORDINATES)     # transAxes transforms (AXES) -> (DISPLAY)     #all transforms -> display coords 
     trans = matplotlib.transforms.blended_transform_factory(x_transform = ax_input.transData,
                                                             y_transform = ax_input.transAxes)# the x coords of this transformation are data, and the y coord are axes
-    
     ##set default bbox
     category_base_y_box = np.array([[0, 0],[0, 0]])#initialize box location for comparison # =[lower_x, lower_y] [upper_x, upper_y]
     ## main loop over categorical ticks, bottom up approach 
-
     for cat in sig_comp_df['category_compared_within'].unique():#iterate over each categorical tick value
         sig_comp_category = sig_comp_df.loc[sig_comp_df.category_compared_within == cat,:]
-
         #get max y position value for each category you're doing post-hoc comparisons within
         top_bbox = category_base_y_box #for first iter, set blank
         category_highest_y = top_bbox[1,1]
-        
         if tight:
             #transform max group location from DATA to AXIS
             max_numeric_ax_value = sig_comp_category.loc[:, ['g1_num_loc','g2_num_loc']].max().values.max()    #get max val in the group of interest you're running posthocs on (x ticks of interest)    
             line_start_y_pos = transform_data_to_ax.transform((0,max_numeric_ax_value))[1]+tight_offset # data -> axes 
-            
             if debug == True:
                 print(f'tight format, max_numeric_ax_value = {max_numeric_ax_value}.  start y val  = {line_start_y_pos}')
             #transData transforms: (DATA) -> (DISPLAY COORDINATES)     # transAxes transforms (AXES) -> (DISPLAY)     
         for comp_count, comp in enumerate(sig_comp_category.itertuples()):
-            
             x_vals = get_sig_bar_x_vals(comp) # [comp.g1_cat_loc, comp.g1_cat_loc, comp.g2_cat_loc, comp.g2_cat_loc]# list the 4 x coord for points that define the line
             ##max of numerical ax values is taken during INITIAL localization of points, not post errorbar detection
             y_vals =get_sig_bar_y_vals(bottom_val = line_start_y_pos,line_height = line_height) #  [comp.max_group_loc_val, comp.max_group_loc_val * h, comp.max_group_loc_val * h, comp.max_group_loc_val] # list 4 y coord for points that define the line
             #compare overlap of proposed y values, in data space 
-            
             if debug == True:
                 print(f"Comp: {comp_count} line overlap = ({y_vals[0]} <= {category_highest_y}). line x_vals, y_vals: {x_vals, y_vals}")
-            
             line_overlap = (y_vals[0] <= category_highest_y )##check y overlap with previous bounding box,       #top right point y val in top_box defined by [1,1]
             if line_overlap: #if the top of the prev bbox overlaps with the current line, move the current line up to ABOVE top bbox
-                
                 y_vals = get_sig_bar_y_vals(category_highest_y+ offset_constant,line_height)             ## if overlaps with previous bounding box, adjust height by N
-            
             #set position for star/sig. annotation
             text_x = (x_vals[0]+ x_vals[2])*.5
             #do you need to have additional space to line 
@@ -211,91 +208,7 @@ def plot_sig_bars_w_comp_df_tight(
                 print(f" annot bbox window extent {type(star_annot.get_window_extent())} ({star_annot.get_window_extent()}")
                 print(f" annot bbox in transform ({star_annot.xycoords}) : ({star_annot.xy})")
                 print(f"bbox transformed: {bbox_in_ax} \n")
-    # #default vcalues
-    # if direction_to_plot is None:
-    #     direction_to_plot = 'bottom_up'
-    #     line_start_y_pos = 0.8 #base case- plot upwards from 0.8 of ax size 
-        
-    # if tight is None:
-    #     tight = True #set whether or not to plot bars RIGHT above datapoints
-        
-    # if tight_offset is None:
-    #     tight_offset = 0.04 #fraction of ax to put between the point of interest and the line of sig post-hoc
-    # #params for offsetting
-    # line_height = 1.00 #base case- 1.01
-    # if offset_constant is None:
-    #     offset_constant = 0.02 #what linear amount to add, in AX FRACTION AMOUNT 
-    # if align is None:
-    #     horz_align = 'center' #horizontal alignment of star over line
-    #     vert_align = 'baseline' #vertical alignment of star over line
-    #     fontsize = 8 #font size of star
-    #     fontweight = 'bold' #font weight of star, changed from light to normal
-    # #originall in ax fraction, I want in pixels?
-    # star_space_to_line = offset_constant*0.025
-    
-    # #declare initial transforms of interest
-    # transform_ax_to_data = ax_input.transAxes + ax_input.transData.inverted() #create ax-display + display-data pipe
-    # transform_data_to_ax = transform_ax_to_data.inverted() # 
-    #     #transData transforms: (DATA) -> (DISPLAY COORDINATES)     # transAxes transforms (AXES) -> (DISPLAY)     #all transforms -> display coords 
-    # trans = matplotlib.transforms.blended_transform_factory(x_transform = ax_input.transData,
-    #                                                         y_transform = ax_input.transAxes)# the x coords of this transformation are data, and the y coord are axes
-    
-    # ##set default bbox
-    # category_base_y_box = np.array([[0, 0],[0, 0]])#initialize box location for comparison # =[lower_x, lower_y] [upper_x, upper_y]
-    # ## main loop over categorical ticks, bottom up approach 
-
-    # for cat in sig_comp_df['category_compared_within'].unique():#iterate over each categorical tick value
-    #     sig_comp_category = sig_comp_df.loc[sig_comp_df.category_compared_within == cat,:]
-
-    #     #get max y position value for each category you're doing post-hoc comparisons within
-    #     top_bbox = category_base_y_box #for first iter, set blank
-    #     category_highest_y = top_bbox[1,1]
-        
-    #     if tight:
-    #         #transform max group location from DATA to AXIS
-    #         max_numeric_ax_value = sig_comp_category.loc[:, ['g1_num_loc','g2_num_loc']].max().values.max()    #get max val in the group of interest you're running posthocs on (x ticks of interest)    
-    #         line_start_y_pos = transform_data_to_ax.transform((0,max_numeric_ax_value))[1]+tight_offset # data -> axes 
-            
-    #         if debug == True:
-    #             print(f'tight format, max_numeric_ax_value = {max_numeric_ax_value}.  start y val  = {line_start_y_pos}')
-    #         #transData transforms: (DATA) -> (DISPLAY COORDINATES)     # transAxes transforms (AXES) -> (DISPLAY)     
-    #     for comp_count, comp in enumerate(sig_comp_category.itertuples()):
-            
-    #         x_vals = get_sig_bar_x_vals(comp) # [comp.g1_cat_loc, comp.g1_cat_loc, comp.g2_cat_loc, comp.g2_cat_loc]# list the 4 x coord for points that define the line
-    #         ##max of numerical ax values is taken during INITIAL localization of points, not post errorbar detection
-    #         y_vals =get_sig_bar_y_vals(bottom_val = line_start_y_pos,line_height = line_height) #  [comp.max_group_loc_val, comp.max_group_loc_val * h, comp.max_group_loc_val * h, comp.max_group_loc_val] # list 4 y coord for points that define the line
-    #         #compare overlap of proposed y values, in data space 
-    #         line_overlap = (y_vals[0] <= category_highest_y )##check y overlap with previous bounding box,       #top right point y val in top_box defined by [1,1]
-    #         if line_overlap: #if the top of the prev bbox overlaps with the current line, move the current line up to ABOVE top bbox
-    #             y_vals = get_sig_bar_y_vals(category_highest_y+offset_constant,line_height)             ## if overlaps with previous bounding box, adjust height by N
-            
-    #         if debug == True:
-    #             print(f"Comp: {comp_count} line overlap = ({y_vals[0]} <= {category_highest_y}). line x_vals, y_vals: {x_vals, y_vals}")
-            
-    #         #set position for star/sig. annotation
-    #         text_x = (x_vals[0]+ x_vals[2])*.5
-    #         text_y = y_vals[1] + star_space_to_line #what linear amount to separate star from line, in AX FRACTION AMOUNT 
-    #         #plot annot line over pair 
-    #         ax_input.plot(x_vals, y_vals, lw=annotator_default['line_width'], color = 'black',transform = trans, clip_on = False)
-    #         #plot sig star over line
-    #         star_str = convert_pvalue_to_asterisks(comp.pvalue)
-    #         star_annot = ax_input.annotate(star_str, ha=horz_align, va=vert_align, fontsize =fontsize,fontweight = fontweight,
-    #                                        xy = (text_x, text_y), xycoords = ('data', 'axes fraction'), 
-    #                                        bbox = {'boxstyle': 'Square', 'pad': 0.05, 'fc': 'None', 'lw': 0})
-    #          #CRITICAL STEP- UPDATE CANVAS BEFORE DRAWING TO ENSURE OVERLAP NOT AFFECTED
-    #         ax_input.figure.canvas.draw()
-    #         bbox_in_ax = ax_input.transAxes.inverted().transform(star_annot.get_window_extent()) #Get the artist's bounding box in display space.
-    #         # ax.transData.inverted() is a matplotlib.transforms.Transform that goes from display coordinates to data coordinates
-    #         top_bbox = bbox_in_ax      #detect overlap by storing, then comparing ot previous versions
-    #         category_highest_y = max(category_highest_y, bbox_in_ax[1, 1] + star_space_to_line)
-
-    #         if debug:
-    #             print(f'text-y = {y_vals[1]} + {star_space_to_line}')
-    #             print(f" annot bbox window extent {type(star_annot.get_window_extent())} ({star_annot.get_window_extent()}")
-    #             print(f" annot bbox in transform ({star_annot.xycoords}) : ({star_annot.xy})")
-    #             print(f"bbox transformed: {bbox_in_ax} \n")
-            
-
+   
 ## test running functinos
 #common error- ValueError: Cannot set a DataFrame with multiple columns to the single column g1_num_loc- this is if you mistype the hue value or you use the wrong version of SNS 
 def main_run_posthoc_tests_and_get_hue_loc_df(ax_input, plot_params, plot_obj, preset_comparisons,
@@ -383,6 +296,11 @@ def main_run_posthoc_tests_and_get_hue_loc_df(ax_input, plot_params, plot_obj, p
     #final posthoc df editing 
     posthoc_df['max_group_loc_val'] = posthoc_df[['g1_num_loc', 'g2_num_loc']].max(axis = 1)    #now, detect max value get max of numerical ax values
     posthoc_df.loc[:, ['group_1_mean','group_1_sem','group_2_mean','group_2_sem']] = posthoc_df.loc[:, ['group_1_mean','group_1_sem','group_2_mean','group_2_sem']].round(4)
+    #new- record what the comparison is, and what the hue level is
+    posthoc_df['numeric_var'] = plot_params['y'] #add actual y column
+    posthoc_df['hue_var'] = hue_var #add actual y column
+    posthoc_df['x_category_var'] = plot_params['x'] #add actual y column
+    posthoc_df['hue_is_x_axis'] = ax_var_is_hue #addbool for checking 
     return posthoc_df
 
 
@@ -465,6 +383,8 @@ def run_posthoc_test_on_tick_hue_groups(ax_tick_data, hue_group_1, hue_group_2, 
     data_group_2_values =data_group_2[value_cols_name].values
     ## run stats on group values
     result_dict = get_pair_stat_test_result(test_name, ax_category_level,group_order, hue_group_1, hue_group_2, data_group_1_values,data_group_2_values,ax_var_is_hue)
+    ##new- 5/12/25- record the ax category level, and the hue group names
+    result_dict['categorical_subgroup'] = ax_category_level
     return result_dict
     
     ## custom function to do stats on grups of interest
@@ -490,14 +410,20 @@ def get_pair_stat_test_result(
     ax order- tells you what order elements in the hue category levels are spread across the ax, so you can use later for indexing'''
     ## run stats on group values
     stat_result= []
+    use_robust_cohen_d = True
+    use_robust_cohen_d_coefficient = False
     if test_name == 'custom':
             print('custom test ran')
     elif test_name == 'MWU':
             stat_result = stats.mannwhitneyu(data_group_1_values, data_group_2_values)
     elif test_name == 'bootstrap_sdev_overlap':
             stat_result = test_group_mean_separation(data_group_1_values, data_group_2_values)
+    
     elif test_name == 'cohen_d':
-            stat_result = test_group_mean_cohen_d(data_group_1_values, data_group_2_values)
+            stat_result = test_group_mean_cohen_d(data_group_1_values, data_group_2_values,
+             use_robust_cohen_d = use_robust_cohen_d,
+             use_robust_cohen_d_coefficient = use_robust_cohen_d_coefficient)
+            
     elif test_name == '2_sample_t_test':
             stat_result = stats.ttest_ind(data_group_1_values, data_group_2_values, equal_var = False) #equal_var = True, run 2 sample ttset, if false, run welch's test for unequal var
     elif test_name == 'permutation_test':
@@ -512,7 +438,9 @@ def get_pair_stat_test_result(
     elif test_name == 'cohen_d':
         group_mean_dict ={'group_1_mean':stat_result['group_1_mean'], 'group_1_sem':stat_result['group_1_std'],
                             'group_2_mean':stat_result['group_2_mean'], 'group_2_sem':stat_result['group_2_std']}
-        stat_result = [stat_result['cohen_d'], stat_result['pseudo_pvalue']]
+        stat_result = [stat_result['cohen_d'], stat_result['pseudo_pvalue'], stat_result['permutation_test_pvalue']]#pseudo-pvalue is U3 of cohen d #new- add permutation test pvalue
+        if use_robust_cohen_d:
+            test_name = {True: "Corrected", False:""}[use_robust_cohen_d_coefficient]+ 'robust_cohen_d' #add note for if you were corrected 
     else:
         group_mean_dict = {'group_1_mean':np.nanmean(data_group_1_values), 'group_1_sem':scipy.stats.sem(data_group_1_values,nan_policy = 'omit' ),
                             'group_2_mean':np.nanmean(data_group_2_values), 'group_2_sem':scipy.stats.sem(data_group_2_values,nan_policy = 'omit')}
@@ -525,13 +453,17 @@ def get_pair_stat_test_result(
         group_pos = {'group_1_order_pos': get_match_index_in_iterable(group_order, ax_category_level),
                    'group_2_order_pos': get_match_index_in_iterable(group_order, ax_category_level)}
         #get where the groups being compared, are listed in the data collections f
-    
+ 
+
     result_dict = {'category_compared_within': ax_category_level,
      'group_1': group_1_name, 'group_2':group_2_name,
      'group_1_n':data_group_1_values.shape, 
      'group_2_n':data_group_2_values.shape,
-     **group_pos, **group_mean_dict,
-     'test_name': test_name, 'stat_result': np.round(stat_result, 5), 'pvalue': stat_result[1]}
+     **group_mean_dict,
+     'test_name': test_name, 
+     'stat_result': np.round(stat_result, 5),
+      'pvalue': stat_result[1],
+      **group_pos}
     return result_dict
     ## build custom plotting ufnction
 
@@ -585,11 +517,11 @@ def get_hue_loc_on_axis(hue_loc_df, posthoc_df, detect_error_bar = False,plot_ty
 
 ## custom stat annotation functions 
 def convert_pvalue_to_asterisks(pvalue):
-    if pvalue <= 0.001:
+    if pvalue < 0.001:
         return "***"
-    elif pvalue <= 0.01:
+    elif pvalue < 0.01:
         return "**"
-    elif pvalue <= 0.05:
+    elif pvalue < 0.05:
         return "*"
     return "ns"
 
