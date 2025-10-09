@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="plot_posthoc_test",
-    version="0.0.1",
+    version="0.1.0",
     author="Carlos Johnson-Cruz",
     author_email="cjohnsoncruz@gmail.com",
     description="Package for performing and plotting posthoc tests, for use with seaborn/matplotlib",

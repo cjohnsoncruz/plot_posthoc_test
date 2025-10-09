@@ -1,26 +1,43 @@
 ## created 9/18/24
 ## TO- collect statannot functions previoulsy collected in /helper functions/ file, and have under one module
-from ax_modifier_functions import *
-from helper_functions import * 
 import scipy
 from scipy import stats
-from stat_tests import * 
 import warnings
 from typing import List, Optional, Union
 
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.transforms as mtransforms
 import numpy as np
+import pandas as pd
 import seaborn as sns
 import logging 
 
+# Import from package utils
+from .utils.stat_tests import (
+    test_group_mean_separation, 
+    test_group_mean_cohen_d, 
+    run_permutation_test_on_diff_of_vector_means
+)
+from .utils.helpers import get_match_index_in_iterable
+
 # Import ax_inference functions without circular import
-# Define imports that will be used when module is part of a package
 try:
-    from plot_posthoc_test.ax_inference import get_x_ticks_as_df, get_hue_point_loc_df, get_hue_errorbar_loc_dict
-# Fall back to direct import when run as a script
+    from .ax_inference import get_x_ticks_as_df, get_hue_point_loc_df, get_hue_errorbar_loc_dict
 except ImportError:
+    # Fallback for direct script execution (though this shouldn't happen in package)
     from ax_inference import get_x_ticks_as_df, get_hue_point_loc_df, get_hue_errorbar_loc_dict
+
+## Default annotation parameters
+annotator_default = {
+    'hide_non_significant': True,
+    'fontsize': 7,
+    'line_width': 0.75,
+    'line_offset': 0,
+    'text_offset': 0,
+    'use_fixed_offset': False,
+    'line_height': 0.0125
+}
 
 ## plotting functions
 path_collection_type = matplotlib.collections.PathCollection
@@ -331,8 +348,7 @@ test_name = None, ax_var_is_hue = False):
     compare_stats_df = []
     #if the ax levels = the hue levels, don't filter the plot data by what ax group col you're on
     if ax_var_is_hue:
-        
-        print(f"With axis variable == Hue variable:")
+        # Axis variable equals hue variable - run comparisons across all groups
         for geno_pair in comparison_list: #iterate over ex. (WT VEH to HET VEH), do stats on each
             posthoc_output= run_posthoc_test_on_tick_hue_groups(plot_data,
                                                                     geno_pair[0], geno_pair[1], geno_pair,group_order,
