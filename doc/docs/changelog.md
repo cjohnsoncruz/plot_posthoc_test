@@ -14,9 +14,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Improved documentation structure with code examples for each alias
   - Moved original function names to "Backward Compatibility" section
 - **Enhanced documentation site** with comprehensive usage guide and updated homepage
-  - Created `doc/docs/usage.md` with detailed examples and best practices
-  - Updated `doc/docs/index.md` with quick start and API overview
-  - Added `doc/docs/changelog.md` for version history in documentation site
 
 ## [0.1.0] - 2025-10-08
 
