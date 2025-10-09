@@ -169,3 +169,9 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Project-specific ignores
+# Development notebooks and helper files (not part of the package)
+behavior figure annotation tests.ipynb
+notebook_setup.py
+Function .py Storage/
