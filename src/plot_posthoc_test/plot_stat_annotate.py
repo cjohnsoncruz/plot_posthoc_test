@@ -429,21 +429,21 @@ def get_pair_stat_test_result(
     use_robust_cohen_d = True
     use_robust_cohen_d_coefficient = False
     if test_name == 'custom':
-            print('custom test ran')
+        print('custom test ran')
     elif test_name == 'MWU':
-            stat_result = stats.mannwhitneyu(data_group_1_values, data_group_2_values)
+        stat_result = stats.mannwhitneyu(data_group_1_values, data_group_2_values)
     elif test_name == 'bootstrap_sdev_overlap':
-            stat_result = test_group_mean_separation(data_group_1_values, data_group_2_values)
+        stat_result = test_group_mean_separation(data_group_1_values, data_group_2_values)
     
     elif test_name == 'cohen_d':
-            stat_result = test_group_mean_cohen_d(data_group_1_values, data_group_2_values,
+        stat_result = test_group_mean_cohen_d(data_group_1_values, data_group_2_values,
              use_robust_cohen_d = use_robust_cohen_d,
              use_robust_cohen_d_coefficient = use_robust_cohen_d_coefficient)
             
     elif test_name == '2_sample_t_test':
-            stat_result = stats.ttest_ind(data_group_1_values, data_group_2_values, equal_var = False) #equal_var = True, run 2 sample ttset, if false, run welch's test for unequal var
+        stat_result = stats.ttest_ind(data_group_1_values, data_group_2_values, equal_var = False) #equal_var = True, run 2 sample ttset, if false, run welch's test for unequal var
     elif test_name == 'permutation_test':
-            stat_result =  run_permutation_test_on_diff_of_vector_means( data_group_1_values, data_group_2_values, 10000) #set to .values as original output is dict, and rounding a rdict fails 
+        stat_result =  run_permutation_test_on_diff_of_vector_means( data_group_1_values, data_group_2_values, 10000) #set to .values as original output is dict, and rounding a rdict fails 
     
     #record the stat values (mean, sem etc)     
     if test_name == 'bootstrap_sdev_overlap':
@@ -579,7 +579,7 @@ def get_sig_bar_y_vals(bottom_val = None, line_height= 1.01):
 ##DEPRECATED, DEFAULT TO USING THE TIGHT VERSION
 ## main stat annotation function- no alterations possible NOW DEFUNCT
 def plot_sig_bars_w_comp_df(ax_input, sig_comp_df, direction_to_plot = None):
-    print(f"WARNING- Deprecated function, use plot_sig_bars_w_comp_df_tight instead")
+    print("WARNING- Deprecated function, use plot_sig_bars_w_comp_df_tight instead")
     """ 
     Plot significance bars with comparison dataframe.
 

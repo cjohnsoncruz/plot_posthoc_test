@@ -57,7 +57,8 @@ def permutation_cohen_d_null(g1_values, g2_values, n_permutations=1000, seed=Non
     Permutes group labels to generate null distribution of effect sizes."""
     g1 = np.asarray(g1_values)
     g2 = np.asarray(g2_values)
-    n1 = g1.size; n2 = g2.size
+    n1 = g1.size
+    n2 = g2.size
     combined = np.concatenate((g1, g2))
     # vectorized permutation via random sorting
     rng = np.random.default_rng(seed)
