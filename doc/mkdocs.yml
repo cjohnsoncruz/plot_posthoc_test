@@ -10,7 +10,7 @@ nav:
   - Home: index.md
   - Usage: usage.md
   - API: api.md
-  - Changelog: changelog.md
+  - Changelog: ../CHANGELOG.md
   - License: license.md
   - GitHub: https://github.com/cjohnsoncruz/plot_posthoc_test
 

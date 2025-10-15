@@ -106,6 +106,16 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 MIT License - see LICENSE file for details
 
+## Acknowledgements
+
+This package was inspired by and includes concepts derived from [statannotations](https://github.com/trevismd/statannotations) by Florian Charlier (@trevismd). 
+
+`plot_posthoc_test` builds upon these ideas with:
+- More direct control over plotting parameters
+- Streamlined function-oriented API
+- Enhanced hue group handling for complex seaborn plots
+- Modular utility structure for statistical tests and axis manipulation
+
 ## Author
 
 Carlos Johnson-Cruz (@cjohnsoncruz)

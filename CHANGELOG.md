@@ -2,21 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Added
+- **Acknowledgements section** in README and documentation homepage
 
 ### Changed
 - **Updated API reference documentation** to centralize and highlight user-friendly aliased functions
   - Reorganized `doc/docs/api.md` with "Recommended API" section featuring aliases first
-  - Added quick reference table mapping aliases to original function names
   - Improved documentation structure with code examples for each alias
   - Moved original function names to "Backward Compatibility" section
 - **Enhanced documentation site** with comprehensive usage guide and updated homepage
   - Created `doc/docs/usage.md` with detailed examples and best practices
   - Updated `doc/docs/index.md` with quick start and API overview
-  - Added `doc/docs/changelog.md` for version history in documentation site
+  - Consolidated changelog: `mkdocs.yml` now references root `CHANGELOG.md` directly (removed duplicate)
 
 ## [0.1.0] - 2025-10-08
 
@@ -46,8 +46,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Import dependencies now properly contained within package
 - Removed dependency on external configuration files
 
-### Removed
-- Suppressed debug print statement: "With axis variable == Hue variable:"
 
 ## [0.0.1] - 2024-12-08
 
